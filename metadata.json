@@ -1,0 +1,5 @@
+{
+  "name": "IntelliBudget Dashboard",
+  "description": "An automated, interactive expense tracking web application that visualizes monthly and yearly financial data with dynamic charts and summaries.",
+  "requestFramePermissions": []
+}

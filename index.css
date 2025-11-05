@@ -1,0 +1,288 @@
+/* IntelliBudget Styles */
+
+/* Custom scrollbar for sidebar */
+nav::-webkit-scrollbar {
+  width: 8px;
+}
+
+nav::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* For Firefox */
+nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) rgba(0, 0, 0, 0.1);
+}
+
+/* Scrollbar for scrollable section inside nav */
+nav div::-webkit-scrollbar {
+  width: 8px;
+}
+
+nav div::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+nav div::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+nav div::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Print Styles */
+@media print {
+  /* Hide navigation and non-essential elements */
+  nav,
+  button:not(.print-keep),
+  .no-print,
+  header,
+  aside {
+    display: none !important;
+  }
+
+  /* Reset main layout for print */
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  main {
+    margin-left: 0 !important;
+    padding: 20px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Ensure all content is visible */
+  .print-container,
+  .print-container * {
+    visibility: visible !important;
+  }
+
+  /* Card styling for print */
+  .bg-white,
+  .bg-gray-50,
+  .bg-gray-100,
+  .bg-gray-800,
+  .bg-gray-900,
+  [class*="bg-gray"] {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Text colors for print */
+  .text-gray-400,
+  .text-gray-500,
+  .text-gray-600,
+  .text-gray-700,
+  .text-gray-800,
+  .text-gray-900 {
+    color: #333 !important;
+  }
+
+  .text-white,
+  .dark\:text-white,
+  .dark\:text-gray-200,
+  .dark\:text-gray-300 {
+    color: black !important;
+  }
+
+  /* Color badges/tags */
+  [class*="rounded-full"] {
+    background: #f0f0f0 !important;
+    color: black !important;
+    border: 1px solid #ccc !important;
+  }
+
+  /* Remove shadows and effects */
+  .shadow-md,
+  .shadow-lg,
+  .shadow-2xl,
+  .shadow-sm {
+    box-shadow: none !important;
+  }
+
+  /* Table styling */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    page-break-inside: auto;
+    display: table !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tbody {
+    display: table-row-group !important;
+  }
+
+  tr {
+    display: table-row !important;
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  th,
+  td {
+    display: table-cell !important;
+    border: 1px solid #ddd !important;
+    padding: 8px !important;
+    text-align: left !important;
+    color: black !important;
+  }
+
+  th {
+    background-color: #f5f5f5 !important;
+    font-weight: bold !important;
+    color: black !important;
+  }
+
+  /* Ensure cards are visible */
+  div[class*="Card"],
+  .card,
+  [class*="rounded-xl"] {
+    background: white !important;
+    border: 1px solid #ddd !important;
+    page-break-inside: avoid;
+    margin-bottom: 15px !important;
+    padding: 15px !important;
+    display: block !important;
+  }
+
+  /* Page breaks */
+  .break-after {
+    page-break-after: always;
+  }
+
+  .break-inside-avoid {
+    page-break-inside: avoid;
+  }
+
+  /* Headings */
+  h1, h2, h3, h4, h5, h6 {
+    color: black !important;
+    page-break-after: avoid;
+  }
+
+  /* Ensure important text is visible */
+  .print-container h1,
+  .print-container h2,
+  .print-container h3,
+  .print-container p,
+  .print-container span,
+  .print-container div {
+    color: black !important;
+  }
+
+  /* Override dark mode styles */
+  .dark\:bg-gray-800,
+  .dark\:bg-gray-900,
+  .dark\:text-white,
+  .dark\:text-gray-200,
+  .dark\:text-gray-300,
+  .dark\:text-gray-400 {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Show overflow content */
+  .overflow-auto,
+  .overflow-x-auto,
+  .overflow-y-auto {
+    overflow: visible !important;
+  }
+
+  /* Remove fixed positioning */
+  .fixed,
+  .sticky {
+    position: static !important;
+  }
+
+  /* Ensure hidden print elements are shown */
+  .hidden.print\:block {
+    display: block !important;
+  }
+
+  /* Force visibility for important content */
+  .print-container table,
+  .print-container thead,
+  .print-container tbody,
+  .print-container tr,
+  .print-container th,
+  .print-container td {
+    display: table !important;
+    visibility: visible !important;
+  }
+
+  .print-container thead {
+    display: table-header-group !important;
+  }
+
+  .print-container tbody {
+    display: table-row-group !important;
+  }
+
+  .print-container tr {
+    display: table-row !important;
+  }
+
+  .print-container th,
+  .print-container td {
+    display: table-cell !important;
+  }
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    font-size: 0.875rem;
+  }
+
+  th,
+  td {
+    padding: 0.5rem !important;
+    white-space: nowrap;
+  }
+
+  .card-mobile {
+    padding: 1rem !important;
+  }
+
+  .text-mobile-sm {
+    font-size: 0.75rem;
+  }
+}
+
+/* Touch-friendly buttons on mobile */
+@media (hover: none) and (pointer: coarse) {
+  button,
+  a,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
