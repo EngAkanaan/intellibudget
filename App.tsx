@@ -655,17 +655,89 @@ const App: React.FC = () => {
     }
   };
 
-  const handleClearAll = () => {
-    setData(initialData);
-    setCategories(INITIAL_CATEGORIES);
-    setCategoryColors(INITIAL_CATEGORY_COLORS);
-    setBudgets({});
-    setRecurringExpenses([]);
-    setPaymentMethods(INITIAL_PAYMENT_METHODS);
-    setPaymentMethodColors(INITIAL_PAYMENT_METHOD_COLORS);
-    setSavingsGoals([]);
-    setRecurringTemplates([]);
-    // Clear localStorage
+  const handleClearAll = async () => {
+    if (!window.confirm('Warning: This action cannot be undone. All your expenses, budgets, categories, and settings will be permanently deleted. Are you sure?')) {
+      return;
+    }
+    
+    try {
+      setDataLoading(true);
+      
+      // Get current user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+      const userId = user.id;
+      
+      // Delete all data from Supabase
+      await supabase.from('expenses').delete().eq('user_id', userId);
+      await supabase.from('monthly_data').delete().eq('user_id', userId);
+      await supabase.from('user_categories').delete().eq('user_id', userId);
+      await supabase.from('budgets').delete().eq('user_id', userId);
+      await supabase.from('recurring_expenses').delete().eq('user_id', userId);
+      await supabase.from('payment_methods').delete().eq('user_id', userId);
+      await supabase.from('recurring_templates').delete().eq('user_id', userId);
+      await supabase.from('savings_goals').delete().eq('user_id', userId);
+      
+      // Create default categories and payment methods
+      for (const category of INITIAL_CATEGORIES) {
+        await categoriesApi.create(category, INITIAL_CATEGORY_COLORS[category] || '#3b82f6');
+      }
+      
+      for (const method of INITIAL_PAYMENT_METHODS) {
+        await paymentMethodsApi.create(method, INITIAL_PAYMENT_METHOD_COLORS[method] || '#3b82f6');
+      }
+      
+      // Reload data from Supabase to get fresh state
+      const [monthlyData, categoriesData, budgetsData, recurringData, paymentMethodsData, templatesData, goalsData] = await Promise.all([
+        monthlyDataApi.getAll().catch(() => []),
+        categoriesApi.getAll().catch(() => []),
+        budgetsApi.getAll().catch(() => ({})),
+        recurringExpensesApi.getAll().catch(() => []),
+        paymentMethodsApi.getAll().catch(() => []),
+        recurringTemplatesApi.getAll().catch(() => []),
+        savingsGoalsApi.getAll().catch(() => []),
+      ]);
+      
+      // Update local state
+      setData(monthlyData.length > 0 ? monthlyData : initialData);
+      
+      if (categoriesData.length > 0) {
+        const cats = categoriesData.map(c => c.name);
+        const colors: {[key: string]: string} = {};
+        categoriesData.forEach(c => { colors[c.name] = c.color; });
+        setCategories(cats);
+        setCategoryColors(colors);
+      } else {
+        setCategories(INITIAL_CATEGORIES);
+        setCategoryColors(INITIAL_CATEGORY_COLORS);
+      }
+      
+      setBudgets(budgetsData);
+      setRecurringExpenses(recurringData);
+      
+      if (paymentMethodsData.length > 0) {
+        const methods = paymentMethodsData.map(m => m.name);
+        const colors: {[key: string]: string} = {};
+        paymentMethodsData.forEach(m => { colors[m.name] = m.color; });
+        setPaymentMethods(methods);
+        setPaymentMethodColors(colors);
+      } else {
+        setPaymentMethods(INITIAL_PAYMENT_METHODS);
+        setPaymentMethodColors(INITIAL_PAYMENT_METHOD_COLORS);
+      }
+      
+      setRecurringTemplates(templatesData);
+      setSavingsGoals(goalsData);
+      
+      alert('✅ All data cleared successfully!');
+    } catch (error) {
+      console.error('Error clearing data:', error);
+      alert('Failed to clear data. Please try again.');
+    } finally {
+      setDataLoading(false);
+    }
+    
+    // Clear localStorage (legacy cleanup)
     localStorage.removeItem('intelliBudgetData');
     localStorage.removeItem('intelliBudgetCategories');
     localStorage.removeItem('intelliBudgetCategoryColors');
