@@ -122,6 +122,16 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!user) {
       setDataLoaded(false);
+      // Reset to initial state when logged out
+      setData(initialData);
+      setCategories(INITIAL_CATEGORIES);
+      setCategoryColors(INITIAL_CATEGORY_COLORS);
+      setBudgets({});
+      setRecurringExpenses([]);
+      setPaymentMethods(INITIAL_PAYMENT_METHODS);
+      setPaymentMethodColors(INITIAL_PAYMENT_METHOD_COLORS);
+      setSavingsGoals([]);
+      setRecurringTemplates([]);
     }
   }, [user]);
   

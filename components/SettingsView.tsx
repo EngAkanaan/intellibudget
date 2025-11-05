@@ -5,9 +5,9 @@ import { formatCurrency } from '../utils/formatters';
 
 interface SettingsViewProps {
   onExport: () => void;
-  onClearAll: () => void;
+  onClearAll: () => void | Promise<void>;
   onBackup: () => string;
-  onRestore: (backup: string) => void;
+  onRestore: (backup: string) => void | Promise<void>;
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ onExport, onClearAll, onBackup, onRestore }) => {
@@ -19,9 +19,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onExport, onClearAll, onBac
     onExport();
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (window.confirm('Are you absolutely sure? This will delete ALL your data and cannot be undone!')) {
-      onClearAll();
+      await onClearAll();
       setShowClearConfirm(false);
     }
   };
@@ -36,14 +36,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onExport, onClearAll, onBac
     }
   };
 
-  const handleRestore = () => {
+  const handleRestore = async () => {
     const backup = backupTextareaRef.current?.value;
     if (!backup || !backup.trim()) {
       alert('Please paste a backup first.');
       return;
     }
     try {
-      onRestore(backup);
+      await onRestore(backup);
       setRestoreSuccess(true);
       setTimeout(() => setRestoreSuccess(false), 3000);
       if (backupTextareaRef.current) backupTextareaRef.current.value = '';
