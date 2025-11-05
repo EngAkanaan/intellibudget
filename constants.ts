@@ -10,16 +10,11 @@ export const INITIAL_CATEGORIES: ExpenseCategory[] = [
 ];
 
 export const INITIAL_CATEGORY_COLORS: { [key in ExpenseCategory]: string } = {
-  'Essentials': '#3b82f6', // blue-500
-  'Food': '#10b981', // emerald-500
-  'Fuel': '#f97316', // orange-500
-  'Personal': '#8b5cf6', // violet-500
-  'Gym': '#ec4899', // pink-500
-  'Loan': '#ef4444', // red-500
-  'Emergency Fund': '#f59e0b', // amber-500
-  'Crypto': '#6366f1', // indigo-500
-  'France Goal': '#d946ef', // fuchsia-500
-  'Flex Reserve': '#14b8a6', // teal-500
+  'Category 1': '#3b82f6', // blue-500
+  'Category 2': '#10b981', // emerald-500
+  'Category 3': '#f59e0b', // amber-500
+  'Category 4': '#ef4444', // red-500
+  'Category 5': '#8b5cf6', // violet-500
   'Other': '#6b7280', // gray-500
 };
 
@@ -38,13 +33,13 @@ export const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Au
 
 // Payment Methods
 export const INITIAL_PAYMENT_METHODS: string[] = [
-  'Cash',
-  'Visa Card',
-  'E-Wallet',
+  'Payment Method 1',
+  'Payment Method 2',
+  'Payment Method 3'
 ];
 
 export const INITIAL_PAYMENT_METHOD_COLORS: { [key: string]: string } = {
-  'Cash': '#10b981', // emerald-500
-  'Visa Card': '#3b82f6', // blue-500
-  'E-Wallet': '#8b5cf6', // violet-500
+  'Payment Method 1': '#10b981', // emerald-500
+  'Payment Method 2': '#3b82f6', // blue-500
+  'Payment Method 3': '#f59e0b', // amber-500
 };
