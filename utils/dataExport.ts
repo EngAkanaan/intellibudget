@@ -54,12 +54,16 @@ export const generateBackup = (exportData: ExportData): string => {
 };
 
 export const validateImportData = (data: any): data is ExportData => {
-  return (
-    data &&
-    Array.isArray(data.data) &&
-    Array.isArray(data.categories) &&
-    typeof data.categoryColors === 'object' &&
-    typeof data.budgets === 'object'
-  );
+  // More flexible validation - accept old backup formats
+  if (!data) return false;
+  
+  // Must have data array (monthly data)
+  if (!Array.isArray(data.data)) return false;
+  
+  // Categories can be array or object (old format might have different structure)
+  // Budgets can be object or missing (old format might not have it)
+  
+  // Allow missing fields for old backups
+  return true;
 };
 

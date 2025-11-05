@@ -449,49 +449,71 @@ const App: React.FC = () => {
 
   const handleRestore = async (backup: string) => {
     try {
-      const importData: ExportData = JSON.parse(backup);
-      if (!validateImportData(importData)) {
-        throw new Error('Invalid backup format');
+      let importData: any;
+      try {
+        importData = JSON.parse(backup);
+      } catch (parseError) {
+        throw new Error('Invalid JSON format. Please check your backup file.');
       }
+      
+      if (!validateImportData(importData)) {
+        throw new Error('Invalid backup format. Please ensure your backup file is from IntelliBudget.');
+      }
+      
+      // Handle old backup formats - ensure required fields exist
+      if (!importData.data || !Array.isArray(importData.data)) {
+        throw new Error('Backup file is missing required data. Please ensure it\'s a valid IntelliBudget backup.');
+      }
+      
       if (window.confirm('This will replace all your current data. Are you sure?')) {
         // Show loading
         setDataLoading(true);
         
         try {
-          // Clear existing data from Supabase first
+          // Get current user ID
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error('User not authenticated');
+          const userId = user.id;
+          
+          // Clear existing data from Supabase first (using user_id for RLS)
           // Delete all expenses
-          const { data: allExpenses } = await supabase
-            .from('expenses')
-            .select('id');
-          if (allExpenses && allExpenses.length > 0) {
-            const expenseIds = allExpenses.map(e => e.id);
-            await supabase.from('expenses').delete().in('id', expenseIds);
-          }
+          await supabase.from('expenses').delete().eq('user_id', userId);
           
           // Delete all monthly data
-          await supabase.from('monthly_data').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('monthly_data').delete().eq('user_id', userId);
           
           // Delete all categories
-          await supabase.from('user_categories').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('user_categories').delete().eq('user_id', userId);
           
           // Delete all budgets
-          await supabase.from('budgets').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('budgets').delete().eq('user_id', userId);
           
           // Delete all recurring expenses
-          await supabase.from('recurring_expenses').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('recurring_expenses').delete().eq('user_id', userId);
           
           // Delete all payment methods
-          await supabase.from('payment_methods').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('payment_methods').delete().eq('user_id', userId);
           
           // Delete all templates
-          await supabase.from('recurring_templates').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('recurring_templates').delete().eq('user_id', userId);
           
-          // Delete all savings goals
-          await supabase.from('savings_goals').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          // Delete all savings goals (contributions will be deleted via foreign key cascade)
+          await supabase.from('savings_goals').delete().eq('user_id', userId);
           
-          // Now restore categories
-          const categoriesToRestore = importData.categories || INITIAL_CATEGORIES;
-          const categoryColorsToRestore = importData.categoryColors || INITIAL_CATEGORY_COLORS;
+          // Now restore categories (handle old format where categories might be an object)
+          let categoriesToRestore: string[] = INITIAL_CATEGORIES;
+          let categoryColorsToRestore: { [key: string]: string } = INITIAL_CATEGORY_COLORS;
+          
+          if (Array.isArray(importData.categories)) {
+            categoriesToRestore = importData.categories;
+          } else if (importData.categories && typeof importData.categories === 'object') {
+            // Old format might have categories as object keys
+            categoriesToRestore = Object.keys(importData.categories);
+          }
+          
+          if (importData.categoryColors && typeof importData.categoryColors === 'object') {
+            categoryColorsToRestore = importData.categoryColors;
+          }
           for (const category of categoriesToRestore) {
             await categoriesApi.create(category, categoryColorsToRestore[category] || '#3b82f6');
           }
