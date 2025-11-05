@@ -5,6 +5,7 @@ import ErrorBoundary from './components/shared/ErrorBoundary';
 import LoadingSpinner from './components/shared/LoadingSpinner';
 import { useAuth } from './contexts/AuthContext';
 import Auth from './components/Auth';
+import { supabase } from './lib/supabase';
 import { 
   monthlyDataApi, 
   expensesApi, 
@@ -12,7 +13,7 @@ import {
   budgetsApi, 
   paymentMethodsApi, 
   recurringExpensesApi, 
-  recurringTemplatesApi, 
+  recurringTemplatesApi,
   savingsGoalsApi 
 } from './services/supabaseApi';
 
@@ -226,18 +227,55 @@ const App: React.FC = () => {
   
   const updateExpense = async (month: string, updatedExpense: Expense) => {
     try {
-      await expensesApi.update(updatedExpense.id, updatedExpense);
-      setData(prevData =>
-        prevData.map(monthlyData => {
-          if (monthlyData.month === month) {
-            return {
-              ...monthlyData,
-              expenses: monthlyData.expenses.map(exp => (exp.id === updatedExpense.id ? updatedExpense : exp)),
-            };
-          }
-          return monthlyData;
-        })
-      );
+      // Check if expense exists in Supabase
+      const { data: existingExpense, error: checkError } = await supabase
+        .from('expenses')
+        .select('id')
+        .eq('id', updatedExpense.id)
+        .single();
+      
+      if (checkError || !existingExpense) {
+        // Expense doesn't exist in Supabase - recreate it
+        console.warn('Expense ID not found in Supabase, recreating:', updatedExpense.id);
+        const newExpense = await expensesApi.create({
+          date: updatedExpense.date,
+          category: updatedExpense.category,
+          subcategory: updatedExpense.subcategory,
+          amount: updatedExpense.amount,
+          notes: updatedExpense.notes,
+          paymentMethod: updatedExpense.paymentMethod,
+          recurringId: updatedExpense.recurringId,
+        }, month);
+        
+        // Update local state with new expense
+        setData(prevData =>
+          prevData.map(monthlyData => {
+            if (monthlyData.month === month) {
+              return {
+                ...monthlyData,
+                expenses: monthlyData.expenses.map(exp => 
+                  exp.id === updatedExpense.id ? newExpense : exp
+                ),
+              };
+            }
+            return monthlyData;
+          })
+        );
+      } else {
+        // Expense exists, update it
+        await expensesApi.update(updatedExpense.id, updatedExpense);
+        setData(prevData =>
+          prevData.map(monthlyData => {
+            if (monthlyData.month === month) {
+              return {
+                ...monthlyData,
+                expenses: monthlyData.expenses.map(exp => (exp.id === updatedExpense.id ? updatedExpense : exp)),
+              };
+            }
+            return monthlyData;
+          })
+        );
+      }
     } catch (error) {
       console.error('Error updating expense:', error);
       alert('Failed to update expense. Please try again.');
@@ -246,18 +284,42 @@ const App: React.FC = () => {
 
   const deleteExpense = async (month: string, expenseId: string) => {
     try {
-      await expensesApi.delete(expenseId);
-      setData(prevData =>
-        prevData.map(monthlyData => {
-          if (monthlyData.month === month) {
-            return {
-              ...monthlyData,
-              expenses: monthlyData.expenses.filter(exp => exp.id !== expenseId),
-            };
-          }
-          return monthlyData;
-        })
-      );
+      // Check if expense exists in Supabase
+      const { data: existingExpense, error: checkError } = await supabase
+        .from('expenses')
+        .select('id')
+        .eq('id', expenseId)
+        .single();
+      
+      if (checkError || !existingExpense) {
+        // Expense doesn't exist in Supabase - just remove from local state
+        console.warn('Expense ID not found in Supabase, removing from local state:', expenseId);
+        setData(prevData =>
+          prevData.map(monthlyData => {
+            if (monthlyData.month === month) {
+              return {
+                ...monthlyData,
+                expenses: monthlyData.expenses.filter(exp => exp.id !== expenseId),
+              };
+            }
+            return monthlyData;
+          })
+        );
+      } else {
+        // Expense exists, delete it
+        await expensesApi.delete(expenseId);
+        setData(prevData =>
+          prevData.map(monthlyData => {
+            if (monthlyData.month === month) {
+              return {
+                ...monthlyData,
+                expenses: monthlyData.expenses.filter(exp => exp.id !== expenseId),
+              };
+            }
+            return monthlyData;
+          })
+        );
+      }
     } catch (error) {
       console.error('Error deleting expense:', error);
       alert('Failed to delete expense. Please try again.');
@@ -385,24 +447,189 @@ const App: React.FC = () => {
     return generateBackup(backupData);
   };
 
-  const handleRestore = (backup: string) => {
+  const handleRestore = async (backup: string) => {
     try {
       const importData: ExportData = JSON.parse(backup);
       if (!validateImportData(importData)) {
         throw new Error('Invalid backup format');
       }
       if (window.confirm('This will replace all your current data. Are you sure?')) {
-        setData(importData.data || initialData);
-        setCategories(importData.categories || INITIAL_CATEGORIES);
-        setCategoryColors(importData.categoryColors || INITIAL_CATEGORY_COLORS);
-        setBudgets(importData.budgets || {});
-        setRecurringExpenses(importData.recurringExpenses || []);
-        if (importData.paymentMethods) setPaymentMethods(importData.paymentMethods);
-        if (importData.paymentMethodColors) setPaymentMethodColors(importData.paymentMethodColors);
-        if (importData.savingsGoals) setSavingsGoals(importData.savingsGoals || []);
+        // Show loading
+        setDataLoading(true);
+        
+        try {
+          // Clear existing data from Supabase first
+          // Delete all expenses
+          const { data: allExpenses } = await supabase
+            .from('expenses')
+            .select('id');
+          if (allExpenses && allExpenses.length > 0) {
+            const expenseIds = allExpenses.map(e => e.id);
+            await supabase.from('expenses').delete().in('id', expenseIds);
+          }
+          
+          // Delete all monthly data
+          await supabase.from('monthly_data').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          
+          // Delete all categories
+          await supabase.from('user_categories').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          
+          // Delete all budgets
+          await supabase.from('budgets').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          
+          // Delete all recurring expenses
+          await supabase.from('recurring_expenses').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          
+          // Delete all payment methods
+          await supabase.from('payment_methods').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          
+          // Delete all templates
+          await supabase.from('recurring_templates').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          
+          // Delete all savings goals
+          await supabase.from('savings_goals').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          
+          // Now restore categories
+          const categoriesToRestore = importData.categories || INITIAL_CATEGORIES;
+          const categoryColorsToRestore = importData.categoryColors || INITIAL_CATEGORY_COLORS;
+          for (const category of categoriesToRestore) {
+            await categoriesApi.create(category, categoryColorsToRestore[category] || '#3b82f6');
+          }
+          
+          // Restore payment methods
+          const paymentMethodsToRestore = importData.paymentMethods || INITIAL_PAYMENT_METHODS;
+          const paymentMethodColorsToRestore = importData.paymentMethodColors || INITIAL_PAYMENT_METHOD_COLORS;
+          for (const method of paymentMethodsToRestore) {
+            await paymentMethodsApi.create(method, paymentMethodColorsToRestore[method] || '#3b82f6');
+          }
+          
+          // Restore monthly data and expenses
+          const dataToRestore = importData.data || initialData;
+          for (const monthlyData of dataToRestore) {
+            // Update salary
+            await monthlyDataApi.updateSalary(monthlyData.month, monthlyData.salary);
+            
+            // Add expenses (this will create new IDs in Supabase)
+            for (const expense of monthlyData.expenses) {
+              await expensesApi.create({
+                date: expense.date,
+                category: expense.category,
+                subcategory: expense.subcategory,
+                amount: expense.amount,
+                notes: expense.notes,
+                paymentMethod: expense.paymentMethod,
+                recurringId: expense.recurringId,
+              }, monthlyData.month);
+            }
+          }
+          
+          // Restore budgets
+          const budgetsToRestore = importData.budgets || {};
+          for (const [month, categories] of Object.entries(budgetsToRestore)) {
+            for (const [category, amount] of Object.entries(categories)) {
+              await budgetsApi.set(month, category, amount);
+            }
+          }
+          
+          // Restore recurring expenses
+          const recurringToRestore = importData.recurringExpenses || [];
+          for (const recurring of recurringToRestore) {
+            await recurringExpensesApi.create({
+              name: recurring.name,
+              category: recurring.category,
+              amount: recurring.amount,
+              frequency: recurring.frequency,
+              startDate: recurring.startDate,
+              endDate: recurring.endDate,
+              notes: recurring.notes,
+              paymentMethod: recurring.paymentMethod,
+            });
+          }
+          
+          // Restore templates
+          const templatesToRestore = importData.recurringTemplates || [];
+          for (const template of templatesToRestore) {
+            await recurringTemplatesApi.create({
+              name: template.name,
+              category: template.category,
+              amount: template.amount,
+              frequency: template.frequency,
+              paymentMethod: template.paymentMethod,
+              notes: template.notes,
+            });
+          }
+          
+          // Restore savings goals
+          const goalsToRestore = importData.savingsGoals || [];
+          for (const goal of goalsToRestore) {
+            const newGoal = await savingsGoalsApi.create({
+              name: goal.name,
+              targetAmount: goal.targetAmount,
+              currentAmount: goal.currentAmount || 0,
+              targetDate: goal.targetDate,
+              category: goal.category,
+            });
+            
+            // Restore contributions
+            if (goal.contributions && goal.contributions.length > 0) {
+              for (const contribution of goal.contributions) {
+                await savingsGoalsApi.addContribution(newGoal.id, {
+                  amount: contribution.amount,
+                  date: contribution.date,
+                  notes: contribution.notes,
+                });
+              }
+            }
+          }
+          
+          // Reload all data from Supabase to get the new IDs
+          const [monthlyData, categoriesData, budgetsData, recurringData, paymentMethodsData, templatesData, goalsData] = await Promise.all([
+            monthlyDataApi.getAll().catch(() => []),
+            categoriesApi.getAll().catch(() => []),
+            budgetsApi.getAll().catch(() => ({})),
+            recurringExpensesApi.getAll().catch(() => []),
+            paymentMethodsApi.getAll().catch(() => []),
+            recurringTemplatesApi.getAll().catch(() => []),
+            savingsGoalsApi.getAll().catch(() => []),
+          ]);
+          
+          // Update local state with new data from Supabase
+          setData(monthlyData.length > 0 ? monthlyData : initialData);
+          
+          if (categoriesData.length > 0) {
+            const cats = categoriesData.map(c => c.name);
+            const colors: {[key: string]: string} = {};
+            categoriesData.forEach(c => { colors[c.name] = c.color; });
+            setCategories(cats);
+            setCategoryColors(colors);
+          }
+          
+          setBudgets(budgetsData);
+          setRecurringExpenses(recurringData);
+          
+          if (paymentMethodsData.length > 0) {
+            const methods = paymentMethodsData.map(m => m.name);
+            const colors: {[key: string]: string} = {};
+            paymentMethodsData.forEach(m => { colors[m.name] = m.color; });
+            setPaymentMethods(methods);
+            setPaymentMethodColors(colors);
+          }
+          
+          setRecurringTemplates(templatesData);
+          setSavingsGoals(goalsData);
+          
+          alert('✅ Data restored successfully! All expenses have been recreated with new IDs.');
+        } catch (error) {
+          console.error('Error restoring data:', error);
+          alert('Failed to restore data. Please try again.');
+          throw error;
+        } finally {
+          setDataLoading(false);
+        }
       }
     } catch (error) {
-      throw new Error('Invalid backup format');
+      console.error('Error parsing backup:', error);
+      alert('Invalid backup format');
     }
   };
 
