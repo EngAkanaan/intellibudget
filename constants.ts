@@ -1,16 +1,11 @@
 import type { ExpenseCategory } from './types';
 
 export const INITIAL_CATEGORIES: ExpenseCategory[] = [
-  'Essentials',
-  'Food',
-  'Fuel',
-  'Personal',
-  'Gym',
-  'Loan',
-  'Emergency Fund',
-  'Crypto',
-  'France Goal',
-  'Flex Reserve',
+  'Category 1',
+  'Category 2',
+  'Category 3',
+  'Category 4',
+  'Category 5',
   'Other'
 ];
 
