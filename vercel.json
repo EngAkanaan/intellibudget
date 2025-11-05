@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd ./IntelliBudget/intellibudget-dashboard && npm install && npm run build",
-  "outputDirectory": "./IntelliBudget/intellibudget-dashboard/dist",
+  "buildCommand": "npm install && npm run build",
+  "outputDirectory": "dist",
   "framework": "vite",
-  "installCommand": "cd ./IntelliBudget/intellibudget-dashboard && npm install"
+  "installCommand": "npm install"
 }
 
