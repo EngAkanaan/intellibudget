@@ -23,7 +23,7 @@ const MonthlyView = lazy(() => import('./components/MonthlyView'));
 const YearlyView = lazy(() => import('./components/YearlyView'));
 const BudgetsView = lazy(() => import('./components/BudgetsView'));
 const RecurringView = lazy(() => import('./components/RecurringView'));
-const SettingsView = lazy(() => import('./components/SettingsView'));
+const ProfileSettingsView = lazy(() => import('./components/ProfileSettingsView'));
 const SavingsGoalsView = lazy(() => import('./components/SavingsGoalsView'));
 const HelpView = lazy(() => import('./components/HelpView'));
 import { LayoutDashboard, Calendar, BarChart3, Wallet, Menu, X, Settings, Repeat, Target, HelpCircle, LogOut } from 'lucide-react';
@@ -892,7 +892,7 @@ const App: React.FC = () => {
         case 'savings':
           return <SavingsGoalsView savingsGoals={savingsGoals} addSavingsGoal={addSavingsGoal} updateSavingsGoal={updateSavingsGoal} deleteSavingsGoal={deleteSavingsGoal} categories={categories} />;
         case 'settings':
-          return <SettingsView onExport={handleExport} onClearAll={handleClearAll} onBackup={handleBackup} onRestore={handleRestore} />;
+          return <ProfileSettingsView onExport={handleExport} onClearAll={handleClearAll} onBackup={handleBackup} onRestore={handleRestore} />;
         case 'help':
           return <HelpView />;
       default:
@@ -944,7 +944,7 @@ const App: React.FC = () => {
             <NavItem view="budgets" icon={<Settings />} label="Budgets & Categories" />
             <NavItem view="recurring" icon={<Repeat />} label="Recurring" />
             <NavItem view="savings" icon={<Target />} label="Savings Goals" />
-            <NavItem view="settings" icon={<Settings />} label="Settings" />
+            <NavItem view="settings" icon={<Settings />} label="Profile & Settings" />
             <NavItem view="help" icon={<HelpCircle />} label="Help & Instructions" />
           </ul>
         </div>
@@ -952,9 +952,21 @@ const App: React.FC = () => {
         {/* Fixed Footer */}
         <div className="flex-shrink-0 pt-4 border-t border-gray-700 px-5 pb-5">
           <LogoutButton />
-          <div className="mt-4 p-3 text-center text-gray-400 text-xs">
-            <p>&copy; {new Date().getFullYear()} IntelliBudget</p>
-            <p className="mt-1">Your smart finance companion.</p>
+          <div className="mt-4 space-y-3">
+            {/* Professional Signature */}
+            <div className="px-3 py-2 bg-gradient-to-r from-gray-700/50 to-gray-800/50 rounded-lg border border-gray-600/30">
+              <p className="text-center text-gray-300 text-xs font-semibold tracking-wide">
+                Eng. Kanaan
+              </p>
+              <p className="text-center text-gray-500 text-[10px] mt-0.5">
+                Full Stack Developer
+              </p>
+            </div>
+            {/* Copyright */}
+            <div className="text-center text-gray-400 text-xs">
+              <p>&copy; {new Date().getFullYear()} IntelliBudget</p>
+              <p className="mt-1 text-gray-500">Your smart finance companion.</p>
+            </div>
           </div>
         </div>
       </nav>
