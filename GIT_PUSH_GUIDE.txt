@@ -1,0 +1,234 @@
+================================================================================
+                    GIT PUSH GUIDE - Quick Reference
+                        IntelliBudget Project
+================================================================================
+
+This guide will help you push your changes to GitHub step by step.
+
+================================================================================
+                           STEP-BY-STEP PROCESS
+================================================================================
+
+STEP 1: CHECK WHAT CHANGED
+---------------------------
+Open terminal/command prompt in your project folder and run:
+
+    git status
+
+This shows:
+    - Modified files (files you changed)
+    - New files (files you created)
+    - Deleted files (files you removed)
+
+Example output:
+    Changes not staged for commit:
+        modified:   App.tsx
+        modified:   components/MonthlyView.tsx
+    Untracked files:
+        new-file.tsx
+
+
+STEP 2: STAGE YOUR CHANGES
+---------------------------
+Add all your changes to the staging area:
+
+    git add .
+
+This stages ALL files (modified, new, deleted)
+
+Alternative - Add specific files only:
+    git add App.tsx
+    git add components/MonthlyView.tsx
+
+
+STEP 3: COMMIT YOUR CHANGES
+----------------------------
+Save your changes with a descriptive message:
+
+    git commit -m "Your descriptive message here"
+
+Examples of good commit messages:
+    git commit -m "Add multiple income sources feature"
+    git commit -m "Fix income modal closing issue"
+    git commit -m "Remove quick notes blinking animation"
+    git commit -m "Add favicons and app icons"
+
+TIP: Write clear, descriptive messages so you know what changed later!
+
+
+STEP 4: PUSH TO GITHUB
+-----------------------
+Upload your commits to GitHub:
+
+    git push origin main
+
+If you're on a different branch (not main):
+    git push origin <branch-name>
+
+Example:
+    git push origin develop
+
+
+================================================================================
+                         COMPLETE WORKFLOW EXAMPLE
+================================================================================
+
+Here's the complete sequence you'll use every time:
+
+1.  git status                    (Check what changed)
+2.  git add .                     (Stage all changes)
+3.  git commit -m "Your message"  (Save changes)
+4.  git push origin main          (Upload to GitHub)
+
+
+================================================================================
+                          USEFUL COMMANDS REFERENCE
+================================================================================
+
+BASIC COMMANDS:
+---------------
+git status                        - See what files changed
+git add .                         - Stage all changes
+git add <filename>                - Stage specific file
+git commit -m "message"           - Save changes with message
+git push origin main              - Upload to GitHub
+git pull origin main              - Download latest from GitHub
+
+
+VIEWING CHANGES:
+----------------
+git diff                          - See what changed (unstaged)
+git diff --staged                 - See what changed (staged)
+git log                           - See commit history
+git log --oneline                 - See commit history (compact)
+
+
+UNDOING CHANGES:
+----------------
+git restore <filename>            - Discard changes to a file (before staging)
+git restore --staged <filename>   - Unstage a file (after git add)
+git reset --soft HEAD~1           - Undo last commit (keep changes)
+git reset --hard HEAD~1           - Undo last commit (discard changes)
+
+
+BRANCHES:
+---------
+git branch                        - List all branches
+git branch <name>                 - Create new branch
+git checkout <name>               - Switch to branch
+git checkout -b <name>            - Create and switch to branch
+git merge <branch>                - Merge branch into current
+
+
+================================================================================
+                            COMMON SITUATIONS
+================================================================================
+
+SITUATION 1: First time pushing (setting up)
+---------------------------------------------
+1.  git add .
+2.  git commit -m "Initial commit"
+3.  git push -u origin main      (the -u sets up tracking)
+
+
+SITUATION 2: Someone else pushed changes to GitHub
+---------------------------------------------------
+1.  git pull origin main         (Download their changes first)
+2.  git add .                    (Stage your changes)
+3.  git commit -m "Your message" (Commit your changes)
+4.  git push origin main         (Push everything)
+
+
+SITUATION 3: Made a mistake in commit message
+----------------------------------------------
+1.  git commit --amend -m "New message"  (Fix last commit message)
+2.  git push origin main --force         (Force push - use carefully!)
+
+
+SITUATION 4: Want to see what you changed before committing
+------------------------------------------------------------
+1.  git diff                    (See all changes)
+2.  git diff App.tsx            (See changes in specific file)
+3.  git status                  (See list of changed files)
+
+
+SITUATION 5: Accidentally staged wrong file
+--------------------------------------------
+1.  git restore --staged <filename>  (Unstage the file)
+2.  git add .                        (Add correct files)
+3.  git commit -m "Your message"     (Continue normally)
+
+
+================================================================================
+                            IMPORTANT NOTES
+================================================================================
+
+✓ ALWAYS run "git status" first to see what changed
+✓ Write CLEAR commit messages describing what you did
+✓ Push after committing to upload to GitHub
+✓ If you get conflicts, pull first, then push
+✓ Don't force push unless you know what you're doing
+✓ Keep commits small and focused (one feature/fix per commit)
+
+
+================================================================================
+                          TYPICAL WORKFLOW
+================================================================================
+
+Daily workflow when making changes:
+
+1.  Make your code changes
+2.  Test your changes
+3.  git status                  (Check what changed)
+4.  git add .                   (Stage changes)
+5.  git commit -m "Description" (Save with message)
+6.  git push origin main        (Upload to GitHub)
+
+That's it! Your changes are now on GitHub and will auto-deploy to Vercel.
+
+
+================================================================================
+                            TROUBLESHOOTING
+================================================================================
+
+ERROR: "Your branch is behind 'origin/main'"
+SOLUTION: Run "git pull origin main" first, then push again
+
+ERROR: "Please commit your changes"
+SOLUTION: You need to commit first (git commit -m "message")
+
+ERROR: "Failed to push"
+SOLUTION: 
+    - Check your internet connection
+    - Make sure you're logged into GitHub
+    - Try: git pull origin main (then push again)
+
+ERROR: "Permission denied"
+SOLUTION:
+    - Check GitHub credentials
+    - Make sure you have push access to the repository
+
+
+================================================================================
+                            QUICK CHEAT SHEET
+================================================================================
+
+Copy and paste this when you need to push:
+
+    git status
+    git add .
+    git commit -m "Your change description"
+    git push origin main
+
+That's the complete workflow!
+
+
+================================================================================
+                              END OF GUIDE
+================================================================================
+
+Keep this file handy for quick reference!
+For more detailed Git documentation, visit: https://git-scm.com/doc
+
+Last updated: January 2025
+
