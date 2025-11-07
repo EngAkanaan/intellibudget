@@ -1,6 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { initialData } from './services/mockData';
-import type { MonthlyData, Expense, RecurringExpense, SavingsGoal, RecurringExpenseTemplate } from './types';
+import type { MonthlyData, Expense, RecurringExpense, SavingsGoal, RecurringExpenseTemplate, IncomeSource } from './types';
 import ErrorBoundary from './components/shared/ErrorBoundary';
 import LoadingSpinner from './components/shared/LoadingSpinner';
 import { useAuth } from './contexts/AuthContext';
@@ -14,7 +14,8 @@ import {
   paymentMethodsApi, 
   recurringExpensesApi, 
   recurringTemplatesApi,
-  savingsGoalsApi 
+  savingsGoalsApi,
+  incomeSourcesApi 
 } from './services/supabaseApi';
 
 // Lazy load components for code splitting
@@ -147,6 +148,7 @@ const App: React.FC = () => {
     const newData = JSON.parse(JSON.stringify(data));
 
     newData.forEach((monthData: MonthlyData) => {
+      // Process recurring expenses
       recurringExpenses.forEach(recurring => {
         const expenseExists = monthData.expenses.some(exp => exp.recurringId === recurring.id);
         
@@ -168,6 +170,48 @@ const App: React.FC = () => {
             };
             monthData.expenses.push(newExpense);
             needsUpdate = true;
+          }
+        }
+      });
+
+      // Process recurring income sources
+      const incomeSources = monthData.incomeSources || [];
+      incomeSources.forEach(income => {
+        if (income.isRecurring && income.recurringDayOfMonth && income.recurringStartDate) {
+          // Check if this month is on or after the start date
+          if (monthData.month >= income.recurringStartDate) {
+            const year = parseInt(monthData.month.split('-')[0]);
+            const month = parseInt(monthData.month.split('-')[1]);
+            const daysInMonth = new Date(year, month, 0).getDate();
+            
+            // Check if income for this day already exists
+            const day = Math.min(income.recurringDayOfMonth, daysInMonth);
+            const dayString = String(day).padStart(2, '0');
+            const expectedDate = `${monthData.month}-${dayString}`;
+            
+            const incomeExists = incomeSources.some(inc => 
+              inc.recurringId === income.recurringId && 
+              inc.date === expectedDate &&
+              inc.id !== income.id // Don't match the template itself
+            );
+            
+            // If income doesn't exist for this month, create it
+            if (!incomeExists) {
+              const newIncome: IncomeSource = {
+                id: `${income.recurringId || income.id}-${monthData.month}-${day}`,
+                description: income.description,
+                amount: income.amount,
+                date: expectedDate,
+                sourceType: income.sourceType,
+                notes: income.notes || '',
+                isRecurring: true,
+                recurringDayOfMonth: income.recurringDayOfMonth,
+                recurringStartDate: income.recurringStartDate,
+                recurringId: income.recurringId || income.id,
+              };
+              monthData.incomeSources = [...(monthData.incomeSources || []), newIncome];
+              needsUpdate = true;
+            }
           }
         }
       });
@@ -349,6 +393,132 @@ const App: React.FC = () => {
     } catch (error) {
       console.error('Error updating salary:', error);
       alert('Failed to update salary. Please try again.');
+    }
+  };
+
+  // Income Sources Management
+  const addIncomeSource = async (month: string, income: Omit<IncomeSource, 'id'>) => {
+    try {
+      // If recurring, generate a recurringId for tracking
+      const incomeWithRecurringId = income.isRecurring && !income.recurringId
+        ? { ...income, recurringId: `recurring-${Date.now()}` }
+        : income;
+
+      const newIncome = await incomeSourcesApi.create(incomeWithRecurringId, month);
+      
+      // If recurring, also create entries for future months
+      if (incomeWithRecurringId.isRecurring && incomeWithRecurringId.recurringDayOfMonth && incomeWithRecurringId.recurringStartDate) {
+        const startYear = parseInt(incomeWithRecurringId.recurringStartDate.split('-')[0]);
+        const startMonth = parseInt(incomeWithRecurringId.recurringStartDate.split('-')[1]);
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1;
+        
+        // Generate income for next 12 months
+        const futureIncomes: Promise<IncomeSource>[] = [];
+        for (let i = 0; i < 12; i++) {
+          const futureDate = new Date(startYear, startMonth - 1 + i, 1);
+          const futureYear = futureDate.getFullYear();
+          const futureMonth = futureDate.getMonth() + 1;
+          const futureMonthString = `${futureYear}-${String(futureMonth).padStart(2, '0')}`;
+          
+          if (futureMonthString > month) {
+            const daysInMonth = new Date(futureYear, futureMonth, 0).getDate();
+            const day = Math.min(incomeWithRecurringId.recurringDayOfMonth!, daysInMonth);
+            const dayString = String(day).padStart(2, '0');
+            
+            futureIncomes.push(
+              incomeSourcesApi.create({
+                ...incomeWithRecurringId,
+                date: `${futureMonthString}-${dayString}`,
+              }, futureMonthString)
+            );
+          }
+        }
+        
+        // Wait for all future incomes to be created
+        const createdIncomes = await Promise.all(futureIncomes);
+        
+        // Update state with all created incomes
+        setData(prevData => {
+          const updated = prevData.map(monthlyData => {
+            const existingSources = monthlyData.incomeSources || [];
+            const monthIncomes = createdIncomes.filter(inc => inc.date.startsWith(monthlyData.month));
+            if (monthlyData.month === month) {
+              return {
+                ...monthlyData,
+                incomeSources: [...existingSources, newIncome, ...monthIncomes],
+              };
+            } else if (monthIncomes.length > 0) {
+              return {
+                ...monthlyData,
+                incomeSources: [...existingSources, ...monthIncomes],
+              };
+            }
+            return monthlyData;
+          });
+          return updated;
+        });
+      } else {
+        // Non-recurring income - just add to current month
+        setData(prevData =>
+          prevData.map(monthlyData => {
+            if (monthlyData.month === month) {
+              const existingSources = monthlyData.incomeSources || [];
+              return {
+                ...monthlyData,
+                incomeSources: [...existingSources, newIncome],
+              };
+            }
+            return monthlyData;
+          })
+        );
+      }
+    } catch (error) {
+      console.error('Error adding income source:', error);
+      alert('Failed to add income source. Please try again.');
+    }
+  };
+
+  const updateIncomeSource = async (month: string, income: IncomeSource) => {
+    try {
+      const updatedIncome = await incomeSourcesApi.update(income.id, income);
+      setData(prevData =>
+        prevData.map(monthlyData => {
+          if (monthlyData.month === month) {
+            const existingSources = monthlyData.incomeSources || [];
+            return {
+              ...monthlyData,
+              incomeSources: existingSources.map(i => i.id === income.id ? updatedIncome : i),
+            };
+          }
+          return monthlyData;
+        })
+      );
+    } catch (error) {
+      console.error('Error updating income source:', error);
+      alert('Failed to update income source. Please try again.');
+    }
+  };
+
+  const deleteIncomeSource = async (month: string, incomeId: string) => {
+    try {
+      await incomeSourcesApi.delete(incomeId);
+      setData(prevData =>
+        prevData.map(monthlyData => {
+          if (monthlyData.month === month) {
+            const existingSources = monthlyData.incomeSources || [];
+            return {
+              ...monthlyData,
+              incomeSources: existingSources.filter(i => i.id !== incomeId),
+            };
+          }
+          return monthlyData;
+        })
+      );
+    } catch (error) {
+      console.error('Error deleting income source:', error);
+      alert('Failed to delete income source. Please try again.');
     }
   };
 
@@ -891,7 +1061,7 @@ const App: React.FC = () => {
       case 'dashboard':
         return <Dashboard data={data} categoryColors={categoryColors} />;
       case 'monthly':
-          return <MonthlyView data={data} addExpense={addExpense} updateExpense={updateExpense} deleteExpense={deleteExpense} categories={categories} categoryColors={categoryColors} budgets={budgets} updateSalary={updateSalary} paymentMethods={paymentMethods} paymentMethodColors={paymentMethodColors} />;
+          return <MonthlyView data={data} addExpense={addExpense} updateExpense={updateExpense} deleteExpense={deleteExpense} categories={categories} categoryColors={categoryColors} budgets={budgets} updateSalary={updateSalary} paymentMethods={paymentMethods} paymentMethodColors={paymentMethodColors} addIncomeSource={addIncomeSource} updateIncomeSource={updateIncomeSource} deleteIncomeSource={deleteIncomeSource} />;
       case 'yearly':
         return <YearlyView data={data} categoryColors={categoryColors} />;
       case 'budgets':

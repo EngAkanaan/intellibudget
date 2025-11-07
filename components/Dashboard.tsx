@@ -63,7 +63,14 @@ const Dashboard: React.FC<DashboardProps> = ({ data, categoryColors }) => {
   const [activeIndex, setActiveIndex] = React.useState(0);
 
   const summary = useMemo(() => {
-    const totalIncome = data.reduce((sum, month) => sum + month.salary, 0);
+    // Calculate total income from income sources, fallback to salary for backward compatibility
+    const totalIncome = data.reduce((sum, month) => {
+      const incomeSources = month.incomeSources || [];
+      if (incomeSources.length > 0) {
+        return sum + incomeSources.reduce((monthSum, inc) => monthSum + inc.amount, 0);
+      }
+      return sum + (month.salary || 0);
+    }, 0);
     const allExpenses = data.flatMap(month => month.expenses);
     const totalExpenses = allExpenses.reduce((sum, expense) => sum + expense.amount, 0);
     const balance = totalIncome - totalExpenses;
@@ -83,11 +90,16 @@ const Dashboard: React.FC<DashboardProps> = ({ data, categoryColors }) => {
       const monthIndex = parseInt(monthData.month.split('-')[1], 10) - 1;
       const year = monthData.month.split('-')[0];
       const totalExpenses = monthData.expenses.reduce((sum, exp) => sum + exp.amount, 0);
+      // Calculate income from income sources, fallback to salary
+      const incomeSources = monthData.incomeSources || [];
+      const totalIncome = incomeSources.length > 0 
+        ? incomeSources.reduce((sum, inc) => sum + inc.amount, 0)
+        : monthData.salary || 0;
       return {
         name: `${MONTH_NAMES[monthIndex]} '${year.slice(2)}`,
-        Income: monthData.salary,
+        Income: totalIncome,
         Expenses: totalExpenses,
-        Balance: monthData.salary - totalExpenses
+        Balance: totalIncome - totalExpenses
       };
     });
   }, [data]);

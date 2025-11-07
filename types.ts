@@ -31,10 +31,24 @@ export interface RecurringExpenseTemplate {
   paymentMethod?: PaymentMethod;
 }
 
+export interface IncomeSource {
+  id: string;
+  description: string; // e.g., "Salary", "Business Income", "Crypto Trading", "Loan Repayment"
+  amount: number;
+  date: string; // YYYY-MM-DD for one-time income
+  sourceType: string; // "salary", "business", "crypto", "loan", "investment", "other"
+  notes?: string;
+  isRecurring?: boolean; // If true, generates income on specific day each month
+  recurringDayOfMonth?: number; // Day of month for recurring income (1-31)
+  recurringStartDate?: string; // YYYY-MM - when recurring income starts
+  recurringId?: string; // ID for recurring income template
+}
+
 export interface MonthlyData {
   month: string; // YYYY-MM, e.g., "2025-11"
-  salary: number;
+  salary: number; // DEPRECATED: Use incomeSources instead. Kept for backward compatibility
   expenses: Expense[];
+  incomeSources?: IncomeSource[]; // New: Multiple income sources
 }
 
 export type ExpenseCategory = string;

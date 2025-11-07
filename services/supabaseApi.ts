@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { MonthlyData, Expense, RecurringExpense, SavingsGoal, RecurringExpenseTemplate } from '../types';
+import type { MonthlyData, Expense, RecurringExpense, SavingsGoal, RecurringExpenseTemplate, IncomeSource } from '../types';
 
 // Helper to get current user ID
 const getUserId = async (): Promise<string> => {
@@ -147,20 +147,54 @@ export const monthlyDataApi = {
       });
     });
 
+    // Get all income sources grouped by month
+    const { data: incomeSources, error: incomeError } = await supabase
+      .from('income_sources')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
+    
+    const incomeSourcesByMonth: { [key: string]: IncomeSource[] } = {};
+    if (!incomeError && incomeSources) {
+      incomeSources.forEach(i => {
+        if (!incomeSourcesByMonth[i.month]) {
+          incomeSourcesByMonth[i.month] = [];
+        }
+        incomeSourcesByMonth[i.month].push({
+          id: i.id,
+          description: i.description,
+          amount: parseFloat(i.amount),
+          date: i.date,
+          sourceType: i.source_type,
+          notes: i.notes || '',
+          isRecurring: i.is_recurring || false,
+          recurringDayOfMonth: i.recurring_day_of_month,
+          recurringStartDate: i.recurring_start_date,
+          recurringId: i.recurring_id,
+        });
+      });
+    }
+
     // Create MonthlyData array
     const result: MonthlyData[] = monthlyData.map(m => ({
       month: m.month,
       salary: parseFloat(m.salary),
       expenses: expensesByMonth[m.month] || [],
+      incomeSources: incomeSourcesByMonth[m.month] || [],
     }));
 
-    // Add months that have expenses but no monthly_data entry
-    Object.keys(expensesByMonth).forEach(month => {
+    // Add months that have expenses or income but no monthly_data entry
+    const allMonths = new Set([
+      ...Object.keys(expensesByMonth),
+      ...Object.keys(incomeSourcesByMonth),
+    ]);
+    allMonths.forEach(month => {
       if (!monthlyData.find(m => m.month === month)) {
         result.push({
           month,
           salary: 0,
-          expenses: expensesByMonth[month],
+          expenses: expensesByMonth[month] || [],
+          incomeSources: incomeSourcesByMonth[month] || [],
         });
       }
     });
@@ -660,6 +694,112 @@ export const savingsGoalsApi = {
         .update({ current_amount: newAmount })
         .eq('id', goalId);
     }
+  },
+};
+
+// ============================================
+// INCOME SOURCES
+// ============================================
+export const incomeSourcesApi = {
+  async getByMonth(month: string): Promise<IncomeSource[]> {
+    const userId = await getUserId();
+    const { data, error } = await supabase
+      .from('income_sources')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('month', month)
+      .order('date', { ascending: false });
+    
+    if (error) throw error;
+    return data.map(i => ({
+      id: i.id,
+      description: i.description,
+      amount: parseFloat(i.amount),
+      date: i.date,
+      sourceType: i.source_type,
+      notes: i.notes || '',
+      isRecurring: i.is_recurring || false,
+      recurringDayOfMonth: i.recurring_day_of_month,
+      recurringStartDate: i.recurring_start_date,
+      recurringId: i.recurring_id,
+    }));
+  },
+
+  async create(income: Omit<IncomeSource, 'id'>, month: string): Promise<IncomeSource> {
+    const userId = await getUserId();
+    const { data, error } = await supabase
+      .from('income_sources')
+      .insert({
+        user_id: userId,
+        month,
+        description: income.description,
+        amount: income.amount,
+        date: income.date,
+        source_type: income.sourceType,
+        notes: income.notes || '',
+        is_recurring: income.isRecurring || false,
+        recurring_day_of_month: income.recurringDayOfMonth,
+        recurring_start_date: income.recurringStartDate,
+        recurring_id: income.recurringId,
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return {
+      id: data.id,
+      description: data.description,
+      amount: parseFloat(data.amount),
+      date: data.date,
+      sourceType: data.source_type,
+      notes: data.notes || '',
+      isRecurring: data.is_recurring || false,
+      recurringDayOfMonth: data.recurring_day_of_month,
+      recurringStartDate: data.recurring_start_date,
+      recurringId: data.recurring_id,
+    };
+  },
+
+  async update(id: string, updates: Partial<IncomeSource>): Promise<IncomeSource> {
+    const { data, error } = await supabase
+      .from('income_sources')
+      .update({
+        description: updates.description,
+        amount: updates.amount,
+        date: updates.date,
+        source_type: updates.sourceType,
+        notes: updates.notes,
+        is_recurring: updates.isRecurring,
+        recurring_day_of_month: updates.recurringDayOfMonth,
+        recurring_start_date: updates.recurringStartDate,
+        month: updates.date ? updates.date.substring(0, 7) : undefined,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return {
+      id: data.id,
+      description: data.description,
+      amount: parseFloat(data.amount),
+      date: data.date,
+      sourceType: data.source_type,
+      notes: data.notes || '',
+      isRecurring: data.is_recurring || false,
+      recurringDayOfMonth: data.recurring_day_of_month,
+      recurringStartDate: data.recurring_start_date,
+      recurringId: data.recurring_id,
+    };
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('income_sources')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
   },
 };
 

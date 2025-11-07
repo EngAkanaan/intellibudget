@@ -2,7 +2,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import type { MonthlyData, Expense, ExpenseCategory } from '../types';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import Card from './shared/Card';
-import { PlusCircle, X, Pencil, Trash2, Check, Search, Filter, AlertCircle, Keyboard, CheckSquare, Square, Bell } from 'lucide-react';
+import { PlusCircle, X, Pencil, Trash2, Check, Search, Filter, AlertCircle, Keyboard, CheckSquare, Square, Bell, DollarSign, Calendar, Repeat } from 'lucide-react';
+
+import type { IncomeSource } from '../types';
 
 interface MonthlyViewProps {
   data: MonthlyData[];
@@ -13,6 +15,11 @@ interface MonthlyViewProps {
   categoryColors: { [key: string]: string };
   budgets: { [month: string]: { [category: string]: number } };
   updateSalary: (month: string, newSalary: number) => void;
+  paymentMethods?: string[];
+  paymentMethodColors?: { [key: string]: string };
+  addIncomeSource: (month: string, income: Omit<IncomeSource, 'id'>) => void;
+  updateIncomeSource: (month: string, income: IncomeSource) => void;
+  deleteIncomeSource: (month: string, incomeId: string) => void;
 }
 
 const BudgetProgressBar: React.FC<{ spent: number; budget: number; color: string }> = ({ spent, budget, color }) => {
@@ -55,7 +62,7 @@ const getCurrentMonth = (): string => {
   return `${year}-${month}`;
 };
 
-const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpense, deleteExpense, categories, categoryColors, budgets, updateSalary, paymentMethods, paymentMethodColors }) => {
+const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpense, deleteExpense, categories, categoryColors, budgets, updateSalary, paymentMethods = [], paymentMethodColors = {}, addIncomeSource, updateIncomeSource, deleteIncomeSource }) => {
   // Get current month or fallback to last month in data if current month doesn't exist
   const currentMonth = getCurrentMonth();
   const defaultMonth = data.find(m => m.month === currentMonth)?.month || data[data.length - 1]?.month || '';
@@ -63,9 +70,23 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpen
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   
-  // State for salary editing
+  // State for salary editing (deprecated, kept for backward compatibility)
   const [isEditingSalary, setIsEditingSalary] = useState(false);
   const [newSalary, setNewSalary] = useState('');
+  
+  // State for income sources management
+  const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
+  const [editingIncome, setEditingIncome] = useState<IncomeSource | null>(null);
+  const [incomeFormState, setIncomeFormState] = useState({
+    description: '',
+    amount: '',
+    date: new Date().toISOString().split('T')[0],
+    sourceType: 'salary',
+    notes: '',
+    isRecurring: false,
+    recurringDayOfMonth: '',
+    recurringStartDate: new Date().toISOString().slice(0, 7),
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('all');
@@ -116,16 +137,21 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpen
   }, [data, selectedMonth]);
 
   const monthlySummary = useMemo(() => {
-    if (!currentMonthData) return { totalExpenses: 0, balance: 0, highestExpense: 0, avgExpense: 0, categoryTotals: {} };
+    if (!currentMonthData) return { totalExpenses: 0, totalIncome: 0, balance: 0, highestExpense: 0, avgExpense: 0, categoryTotals: {} };
     const totalExpenses = currentMonthData.expenses.reduce((sum, exp) => sum + exp.amount, 0);
-    const balance = currentMonthData.salary - totalExpenses;
+    // Calculate total income from income sources, fallback to salary for backward compatibility
+    const incomeSources = currentMonthData.incomeSources || [];
+    const totalIncome = incomeSources.length > 0 
+      ? incomeSources.reduce((sum, inc) => sum + inc.amount, 0)
+      : currentMonthData.salary || 0;
+    const balance = totalIncome - totalExpenses;
     const highestExpense = Math.max(0, ...currentMonthData.expenses.map(e => e.amount));
     const avgExpense = currentMonthData.expenses.length > 0 ? totalExpenses / currentMonthData.expenses.length : 0;
     const categoryTotals = currentMonthData.expenses.reduce((acc, exp) => {
         acc[exp.category] = (acc[exp.category] || 0) + exp.amount;
         return acc;
     }, {} as {[key: string]: number});
-    return { totalExpenses, balance, highestExpense, avgExpense, categoryTotals };
+    return { totalExpenses, totalIncome, balance, highestExpense, avgExpense, categoryTotals };
   }, [currentMonthData]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -218,6 +244,83 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpen
     }
   };
 
+  // Income Sources Management
+  const openAddIncomeModal = () => {
+    setEditingIncome(null);
+    setIncomeFormState({
+      description: '',
+      amount: '',
+      date: new Date().toISOString().split('T')[0],
+      sourceType: 'salary',
+      notes: '',
+      isRecurring: false,
+      recurringDayOfMonth: '',
+      recurringStartDate: new Date().toISOString().slice(0, 7),
+    });
+    setIsIncomeModalOpen(true);
+  };
+
+  const openEditIncomeModal = (income: IncomeSource) => {
+    setEditingIncome(income);
+    setIncomeFormState({
+      description: income.description,
+      amount: income.amount.toString(),
+      date: income.date,
+      sourceType: income.sourceType,
+      notes: income.notes || '',
+      isRecurring: income.isRecurring || false,
+      recurringDayOfMonth: income.recurringDayOfMonth?.toString() || '',
+      recurringStartDate: income.recurringStartDate || new Date().toISOString().slice(0, 7),
+    });
+    setIsIncomeModalOpen(true);
+  };
+
+  const closeIncomeModal = () => {
+    setIsIncomeModalOpen(false);
+    setEditingIncome(null);
+  };
+
+  const handleIncomeInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    if (type === 'checkbox') {
+      const checked = (e.target as HTMLInputElement).checked;
+      setIncomeFormState(prev => ({ ...prev, [name]: checked }));
+    } else {
+      setIncomeFormState(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const handleIncomeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMonth || !incomeFormState.amount || !incomeFormState.description) return;
+
+    const incomeData: Omit<IncomeSource, 'id'> = {
+      description: incomeFormState.description,
+      amount: parseFloat(incomeFormState.amount),
+      date: incomeFormState.date,
+      sourceType: incomeFormState.sourceType,
+      notes: incomeFormState.notes,
+      isRecurring: incomeFormState.isRecurring,
+      recurringDayOfMonth: incomeFormState.isRecurring && incomeFormState.recurringDayOfMonth 
+        ? parseInt(incomeFormState.recurringDayOfMonth, 10) 
+        : undefined,
+      recurringStartDate: incomeFormState.isRecurring ? incomeFormState.recurringStartDate : undefined,
+    };
+
+    if (editingIncome) {
+      updateIncomeSource(selectedMonth, { ...incomeData, id: editingIncome.id });
+    } else {
+      addIncomeSource(selectedMonth, incomeData);
+    }
+    closeIncomeModal();
+  };
+
+  const handleDeleteIncome = (incomeId: string) => {
+    if (window.confirm('Are you sure you want to delete this income source?')) {
+      deleteIncomeSource(selectedMonth, incomeId);
+    }
+  };
+
   // Duplicate detection
   const duplicateExpenses = useMemo(() => {
     if (!currentMonthData) return [];
@@ -296,12 +399,17 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpen
         setIsModalOpen(false);
         setEditingExpense(null);
       }
+      // Escape to close income modal
+      if (e.key === 'Escape' && isIncomeModalOpen) {
+        e.preventDefault();
+        closeIncomeModal();
+      }
     };
 
     // Use capture phase to catch the event before browser handles it
     document.addEventListener('keydown', handleKeyPress, true);
     return () => document.removeEventListener('keydown', handleKeyPress, true);
-  }, [isModalOpen, paymentMethods]);
+  }, [isModalOpen, isIncomeModalOpen, paymentMethods]);
 
   const monthBudgets = budgets[selectedMonth] || {};
   const budgetStatusData = useMemo(() => {
@@ -478,28 +586,49 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpen
         <>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
-              <div className="flex justify-between items-start">
+              <div className="flex justify-between items-start mb-2">
                   <div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Income</p>
-                      {!isEditingSalary ? (
-                          <p className="text-xl font-semibold text-green-500">{formatCurrency(currentMonthData.salary)}</p>
-                      ) : (
-                          <input
-                              type="number"
-                              value={newSalary}
-                              onChange={(e) => setNewSalary(e.target.value)}
-                              className="w-32 p-1 rounded-md bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                      )}
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Total Income</p>
+                      <p className="text-xl font-semibold text-green-500">{formatCurrency(monthlySummary.totalIncome)}</p>
                   </div>
-                  {!isEditingSalary ? (
-                      <button onClick={handleSalaryEdit} className="text-gray-400 hover:text-blue-500"><Pencil size={16} /></button>
-                  ) : (
-                      <div className="flex space-x-2">
-                          <button onClick={handleSalarySave} className="text-green-500 hover:text-green-400"><Check size={18} /></button>
-                          <button onClick={() => setIsEditingSalary(false)} className="text-red-500 hover:text-red-400"><X size={18} /></button>
+                  <button 
+                    onClick={openAddIncomeModal} 
+                    className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors"
+                    title="Add Income Source"
+                  >
+                    <PlusCircle size={16} />
+                    <span className="hidden sm:inline">Add</span>
+                  </button>
+              </div>
+              {/* Income Sources List */}
+              <div className="mt-3 space-y-2 max-h-32 overflow-y-auto">
+                {currentMonthData.incomeSources && currentMonthData.incomeSources.length > 0 ? (
+                  currentMonthData.incomeSources.map((income) => (
+                    <div key={income.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-lg group">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <DollarSign size={14} className="text-green-600 dark:text-green-400 flex-shrink-0" />
+                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{income.description}</span>
+                          {income.isRecurring && <Repeat size={12} className="text-blue-500 flex-shrink-0" title="Recurring" />}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">{formatDate(income.date)}</span>
+                          <span className="text-xs text-green-600 dark:text-green-400 font-semibold">{formatCurrency(income.amount)}</span>
+                        </div>
                       </div>
-                  )}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => openEditIncomeModal(income)} className="p-1 text-gray-400 hover:text-blue-500" title="Edit">
+                          <Pencil size={14} />
+                        </button>
+                        <button onClick={() => handleDeleteIncome(income.id)} className="p-1 text-gray-400 hover:text-red-500" title="Delete">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-2">No income sources yet</p>
+                )}
               </div>
             </Card>
             <Card><p className="text-sm text-gray-500 dark:text-gray-400">Expenses</p><p className="text-xl font-semibold text-red-500">{formatCurrency(monthlySummary.totalExpenses)}</p></Card>
@@ -713,6 +842,164 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpen
             </div>
         </Card>
         </>
+      )}
+
+      {/* Income Source Modal */}
+      {isIncomeModalOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50" 
+          onClick={(e) => {
+            // Only close if clicking directly on the backdrop, not on modal content
+            if (e.target === e.currentTarget) {
+              closeIncomeModal();
+            }
+          }}
+        >
+          <Card className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{editingIncome ? 'Edit Income Source' : 'Add Income Source'}</h2>
+              <button onClick={closeIncomeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X /></button>
+            </div>
+            <form onSubmit={handleIncomeSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description *</label>
+                <input 
+                  type="text" 
+                  name="description" 
+                  value={incomeFormState.description} 
+                  onChange={handleIncomeInputChange} 
+                  onClick={(e) => e.stopPropagation()}
+                  onFocus={(e) => e.stopPropagation()}
+                  placeholder="e.g., Salary, Business Income, Crypto Trading"
+                  className="w-full p-2 rounded-md bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white" 
+                  required 
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount *</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    name="amount" 
+                    value={incomeFormState.amount} 
+                    onChange={handleIncomeInputChange} 
+                    onClick={(e) => e.stopPropagation()}
+                    onFocus={(e) => e.stopPropagation()}
+                    placeholder="0.00" 
+                    className="w-full p-2 rounded-md bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white" 
+                    required 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Source Type *</label>
+                  <select 
+                    name="sourceType" 
+                    value={incomeFormState.sourceType} 
+                    onChange={handleIncomeInputChange} 
+                    onClick={(e) => e.stopPropagation()}
+                    onFocus={(e) => e.stopPropagation()}
+                    className="w-full p-2 rounded-md bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white" 
+                    required
+                  >
+                    <option value="salary">Salary</option>
+                    <option value="business">Business</option>
+                    <option value="crypto">Crypto</option>
+                    <option value="loan">Loan Repayment</option>
+                    <option value="investment">Investment</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date *</label>
+                <input 
+                  type="date" 
+                  name="date" 
+                  value={incomeFormState.date} 
+                  onChange={handleIncomeInputChange} 
+                  onClick={(e) => e.stopPropagation()}
+                  onFocus={(e) => e.stopPropagation()}
+                  className="w-full p-2 rounded-md bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white" 
+                  required 
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    name="isRecurring" 
+                    checked={incomeFormState.isRecurring} 
+                    onChange={handleIncomeInputChange}
+                    onClick={(e) => e.stopPropagation()}
+                    onFocus={(e) => e.stopPropagation()}
+                    className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Recurring Income (e.g., salary on 1st and 15th)</span>
+                </label>
+              </div>
+              {incomeFormState.isRecurring && (
+                <div className="grid grid-cols-2 gap-4 pl-6 border-l-2 border-green-500">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Day of Month (1-31)</label>
+                    <input 
+                      type="number" 
+                      name="recurringDayOfMonth" 
+                      value={incomeFormState.recurringDayOfMonth} 
+                      onChange={handleIncomeInputChange} 
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => e.stopPropagation()}
+                      min="1" 
+                      max="31"
+                      placeholder="e.g., 1 or 15"
+                      className="w-full p-2 rounded-md bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
+                    <input 
+                      type="month" 
+                      name="recurringStartDate" 
+                      value={incomeFormState.recurringStartDate} 
+                      onChange={handleIncomeInputChange} 
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => e.stopPropagation()}
+                      className="w-full p-2 rounded-md bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white" 
+                    />
+                  </div>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes (optional)</label>
+                <textarea 
+                  name="notes" 
+                  value={incomeFormState.notes} 
+                  onChange={handleIncomeInputChange} 
+                  onClick={(e) => e.stopPropagation()}
+                  onFocus={(e) => e.stopPropagation()}
+                  placeholder="Additional notes..."
+                  rows={2}
+                  className="w-full p-2 rounded-md bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white resize-none"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button 
+                  type="button" 
+                  onClick={closeIncomeModal} 
+                  className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  {editingIncome ? 'Update' : 'Add'} Income
+                </button>
+              </div>
+            </form>
+          </Card>
+        </div>
       )}
 
       {isModalOpen && (

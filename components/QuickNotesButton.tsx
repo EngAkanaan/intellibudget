@@ -22,8 +22,6 @@ const QuickNotesButton: React.FC<QuickNotesButtonProps> = ({ onNoteAdded }) => {
           size={24} 
           className="transition-transform group-hover:rotate-12" 
         />
-        {/* Pulse animation */}
-        <span className="absolute inset-0 rounded-full bg-blue-400 opacity-75 animate-ping"></span>
       </button>
 
       {/* Quick Notes Modal */}
