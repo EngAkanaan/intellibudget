@@ -374,6 +374,33 @@ const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({ onExport, onC
             </div>
           )}
         </Card>
+
+        {/* Professional Signature */}
+        <Card className="lg:col-span-2">
+          <div className="py-4">
+            <div className="flex items-center justify-between w-full px-6">
+              <div className="flex flex-col">
+                <p className="text-blue-600 dark:text-blue-400 text-lg font-bold">
+                  Eng. AJK
+                </p>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                  Full Stack Developer
+                </p>
+              </div>
+              <div className="flex flex-col items-end">
+                <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">
+                  Contact Support
+                </p>
+                <a 
+                  href="mailto:ajkanaan004@gmail.com" 
+                  className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-semibold transition-colors"
+                >
+                  ajkanaan004@gmail.com
+                </a>
+              </div>
+            </div>
+          </div>
+        </Card>
       </div>
     </div>
   );

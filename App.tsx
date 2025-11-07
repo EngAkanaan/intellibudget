@@ -26,11 +26,13 @@ const RecurringView = lazy(() => import('./components/RecurringView'));
 const ProfileSettingsView = lazy(() => import('./components/ProfileSettingsView'));
 const SavingsGoalsView = lazy(() => import('./components/SavingsGoalsView'));
 const HelpView = lazy(() => import('./components/HelpView'));
-import { LayoutDashboard, Calendar, BarChart3, Wallet, Menu, X, Settings, Repeat, Target, HelpCircle, LogOut } from 'lucide-react';
+const QuickNotesView = lazy(() => import('./components/QuickNotesView'));
+import QuickNotesButton from './components/QuickNotesButton';
+import { LayoutDashboard, Calendar, BarChart3, Wallet, Menu, X, Settings, Repeat, Target, HelpCircle, LogOut, MessageSquare } from 'lucide-react';
 import { INITIAL_CATEGORIES, INITIAL_CATEGORY_COLORS, PALETTE_COLORS, INITIAL_PAYMENT_METHODS, INITIAL_PAYMENT_METHOD_COLORS } from './constants';
 import { exportToCSV, exportToJSON, generateBackup, validateImportData, type ExportData } from './utils/dataExport';
 
-type View = 'dashboard' | 'monthly' | 'yearly' | 'budgets' | 'recurring' | 'settings' | 'savings' | 'help';
+type View = 'dashboard' | 'monthly' | 'yearly' | 'budgets' | 'recurring' | 'settings' | 'savings' | 'help' | 'quicknotes';
 
 const App: React.FC = () => {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -194,9 +196,9 @@ const App: React.FC = () => {
           window.location.reload();
         }
       }}
-      className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-lg transition-all text-sm font-medium shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
+      className="w-full flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-lg transition-all text-xs font-medium shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
     >
-      <LogOut size={18} className="flex-shrink-0" />
+      <LogOut size={16} className="flex-shrink-0" />
       <span>Sign Out</span>
     </button>
   );
@@ -366,6 +368,11 @@ const App: React.FC = () => {
   };
 
   const deleteCategory = async (categoryToDelete: string) => {
+    // Protect 'Other' category from deletion
+    if (categoryToDelete === 'Other') {
+      alert("The 'Other' category cannot be deleted.");
+      return;
+    }
     try {
       await categoriesApi.delete(categoryToDelete);
       
@@ -859,7 +866,7 @@ const App: React.FC = () => {
     label: string;
   }> = ({ view, icon, label }) => (
     <li
-      className={`cursor-pointer flex items-center p-3 rounded-lg transition-all duration-200 ${
+      className={`cursor-pointer flex items-center p-2 rounded-lg transition-all duration-200 ${
         activeView === view
           ? 'bg-blue-600 text-white shadow-lg'
           : 'text-gray-400 hover:bg-gray-700 hover:text-white'
@@ -871,8 +878,10 @@ const App: React.FC = () => {
         }
       }}
     >
-      {icon}
-      <span className="ml-4 font-medium">{label}</span>
+      <div className="flex-shrink-0" style={{ width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {React.cloneElement(icon as React.ReactElement, { size: 18 })}
+      </div>
+      <span className="ml-2 text-sm font-medium truncate">{label}</span>
     </li>
   );
 
@@ -893,6 +902,16 @@ const App: React.FC = () => {
           return <SavingsGoalsView savingsGoals={savingsGoals} addSavingsGoal={addSavingsGoal} updateSavingsGoal={updateSavingsGoal} deleteSavingsGoal={deleteSavingsGoal} categories={categories} />;
         case 'settings':
           return <ProfileSettingsView onExport={handleExport} onClearAll={handleClearAll} onBackup={handleBackup} onRestore={handleRestore} />;
+        case 'quicknotes':
+          return <QuickNotesView categories={categories} paymentMethods={paymentMethods} onAddExpense={async (month, expense) => {
+            await addExpense(month, {
+              date: expense.date,
+              category: expense.category,
+              amount: expense.amount,
+              notes: expense.notes,
+              paymentMethod: expense.paymentMethod,
+            });
+          }} />;
         case 'help':
           return <HelpView />;
       default:
@@ -917,19 +936,15 @@ const App: React.FC = () => {
       {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/60 z-30 lg:hidden" />}
 
       <nav className={`w-64 bg-gray-800 dark:bg-black flex flex-col fixed h-full shadow-2xl z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        {/* Fixed Header */}
-        <div className="flex-shrink-0 p-5 border-b border-gray-700">
-          <div className="flex items-center">
-            <Wallet className="w-10 h-10 text-blue-500" />
-            <h1 className="text-2xl font-bold ml-3 text-white">IntelliBudget</h1>
+        {/* Merged Header with Welcome */}
+        <div className="flex-shrink-0 p-3 border-b border-gray-700">
+          <div className="flex items-center mb-2">
+            <Wallet className="w-8 h-8 text-blue-500" />
+            <h1 className="text-xl font-bold ml-2 text-white">IntelliBudget</h1>
           </div>
-        </div>
-        
-        {/* Fixed Welcome Section */}
-        <div className="flex-shrink-0 px-5 py-4 border-b border-gray-700">
-          <div className="px-4 py-3 bg-gradient-to-r from-blue-700 to-blue-800 rounded-lg shadow-md">
-            <p className="text-xs text-blue-200 mb-1">Welcome back,</p>
-            <p className="text-sm text-white font-semibold truncate">
+          <div className="px-2 py-1.5 bg-gradient-to-r from-blue-700 to-blue-800 rounded-lg shadow-md">
+            <p className="text-[10px] text-blue-200 mb-0.5">Welcome back,</p>
+            <p className="text-xs text-white font-semibold truncate">
               {user.user_metadata?.full_name || user.user_metadata?.first_name || user.email?.split('@')[0] || 'User'}
             </p>
           </div>
@@ -937,35 +952,27 @@ const App: React.FC = () => {
         
         {/* Scrollable Navigation Items */}
         <div className="flex-1 overflow-y-auto min-h-0 scroll-smooth">
-          <ul className="space-y-2 p-5">
+          <ul className="space-y-1 p-2">
             <NavItem view="dashboard" icon={<LayoutDashboard />} label="Dashboard" />
             <NavItem view="monthly" icon={<Calendar />} label="Monthly Details" />
             <NavItem view="yearly" icon={<BarChart3 />} label="Yearly Summary" />
             <NavItem view="budgets" icon={<Settings />} label="Budgets & Categories" />
             <NavItem view="recurring" icon={<Repeat />} label="Recurring" />
             <NavItem view="savings" icon={<Target />} label="Savings Goals" />
+            <NavItem view="quicknotes" icon={<MessageSquare />} label="Quick Notes" />
             <NavItem view="settings" icon={<Settings />} label="Profile & Settings" />
             <NavItem view="help" icon={<HelpCircle />} label="Help & Instructions" />
           </ul>
         </div>
         
         {/* Fixed Footer */}
-        <div className="flex-shrink-0 pt-4 border-t border-gray-700 px-5 pb-5">
+        <div className="flex-shrink-0 pt-2 border-t border-gray-700 px-3 pb-3">
           <LogoutButton />
-          <div className="mt-4 space-y-3">
-            {/* Professional Signature */}
-            <div className="px-3 py-2 bg-gradient-to-r from-gray-700/50 to-gray-800/50 rounded-lg border border-gray-600/30">
-              <p className="text-center text-gray-300 text-xs font-semibold tracking-wide">
-                Eng. Kanaan
-              </p>
-              <p className="text-center text-gray-500 text-[10px] mt-0.5">
-                Full Stack Developer
-              </p>
-            </div>
+          <div className="mt-2 space-y-2">
             {/* Copyright */}
-            <div className="text-center text-gray-400 text-xs">
+            <div className="text-center text-gray-400 text-[10px]">
               <p>&copy; {new Date().getFullYear()} IntelliBudget</p>
-              <p className="mt-1 text-gray-500">Your smart finance companion.</p>
+              <p className="mt-0.5 text-gray-500 text-[9px]">Your smart finance companion.</p>
             </div>
           </div>
         </div>
@@ -978,6 +985,9 @@ const App: React.FC = () => {
         </div>
         {renderView()}
       </main>
+      
+      {/* Floating Quick Notes Button - Always visible */}
+      <QuickNotesButton />
     </div>
     </ErrorBoundary>
   );

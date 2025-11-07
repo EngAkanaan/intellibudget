@@ -1,20 +1,18 @@
 import type { ExpenseCategory } from './types';
 
 export const INITIAL_CATEGORIES: ExpenseCategory[] = [
-  'Category 1',
-  'Category 2',
-  'Category 3',
-  'Category 4',
-  'Category 5',
+  'Food',
+  'Travel',
+  'Transportation',
+  'Gym',
   'Other'
 ];
 
 export const INITIAL_CATEGORY_COLORS: { [key in ExpenseCategory]: string } = {
-  'Category 1': '#3b82f6', // blue-500
-  'Category 2': '#10b981', // emerald-500
-  'Category 3': '#f59e0b', // amber-500
-  'Category 4': '#ef4444', // red-500
-  'Category 5': '#8b5cf6', // violet-500
+  'Food': '#f59e0b', // amber-500
+  'Travel': '#3b82f6', // blue-500
+  'Transportation': '#10b981', // emerald-500
+  'Gym': '#ef4444', // red-500
   'Other': '#6b7280', // gray-500
 };
 
@@ -33,13 +31,13 @@ export const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Au
 
 // Payment Methods
 export const INITIAL_PAYMENT_METHODS: string[] = [
-  'Payment Method 1',
-  'Payment Method 2',
-  'Payment Method 3'
+  'Cash',
+  'Visa Card',
+  'MasterCard'
 ];
 
 export const INITIAL_PAYMENT_METHOD_COLORS: { [key: string]: string } = {
-  'Payment Method 1': '#10b981', // emerald-500
-  'Payment Method 2': '#3b82f6', // blue-500
-  'Payment Method 3': '#f59e0b', // amber-500
+  'Cash': '#10b981', // emerald-500
+  'Visa Card': '#3b82f6', // blue-500
+  'MasterCard': '#ef4444', // red-500
 };

@@ -257,26 +257,65 @@ export const budgetsApi = {
   async set(month: string, category: string, amount: number): Promise<void> {
     const userId = await getUserId();
     
-    // Check if exists
-    const { data: existing } = await supabase
+    // Check if exists (use maybeSingle() to avoid error if no record exists)
+    const { data: existing, error: checkError } = await supabase
       .from('budgets')
       .select('id')
       .eq('user_id', userId)
       .eq('month', month)
       .eq('category', category)
-      .single();
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Error checking budget:', checkError);
+      throw checkError;
+    }
 
     if (existing) {
+      // Update existing budget
       const { error } = await supabase
         .from('budgets')
         .update({ amount })
         .eq('id', existing.id);
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating budget:', error);
+        throw error;
+      }
     } else {
+      // Insert new budget
       const { error } = await supabase
         .from('budgets')
         .insert({ user_id: userId, month, category, amount });
-      if (error) throw error;
+      if (error) {
+        // If insert fails due to duplicate (race condition), try update instead
+        if (error.code === '23505') { // PostgreSQL unique constraint violation
+          const { data: existingAfterRace, error: retryError } = await supabase
+            .from('budgets')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('month', month)
+            .eq('category', category)
+            .maybeSingle();
+          
+          if (retryError || !existingAfterRace) {
+            console.error('Error retrying budget update:', retryError || 'No record found');
+            throw error;
+          }
+          
+          const { error: updateError } = await supabase
+            .from('budgets')
+            .update({ amount })
+            .eq('id', existingAfterRace.id);
+          
+          if (updateError) {
+            console.error('Error updating budget after race condition:', updateError);
+            throw updateError;
+          }
+        } else {
+          console.error('Error inserting budget:', error);
+          throw error;
+        }
+      }
     }
   },
 };
@@ -331,47 +370,87 @@ export const recurringExpensesApi = {
       .order('created_at', { ascending: false });
     
     if (error) throw error;
-    return data.map(e => ({
-      id: e.id,
-      name: e.name,
-      category: e.category,
-      amount: parseFloat(e.amount),
-      frequency: e.frequency as 'daily' | 'weekly' | 'monthly',
-      startDate: e.start_date,
-      endDate: e.end_date,
-      notes: e.notes || '',
-      paymentMethod: e.payment_method,
-    }));
+    return data.map(e => {
+      // Map from database format to frontend format
+      // Database has: name, frequency, start_date (may be YYYY-MM-DD)
+      // Frontend expects: description, dayOfMonth, startDate (YYYY-MM)
+      // Extract dayOfMonth from notes field where we store it
+      let dayOfMonth = 1;
+      if (e.notes && e.notes.includes('dayOfMonth:')) {
+        const match = e.notes.match(/dayOfMonth:(\d+)/);
+        if (match) dayOfMonth = parseInt(match[1], 10);
+      }
+      
+      // Convert start_date from YYYY-MM-DD to YYYY-MM if needed
+      let startDate = e.start_date;
+      if (startDate && startDate.length === 10) {
+        startDate = startDate.substring(0, 7); // Extract YYYY-MM from YYYY-MM-DD
+      }
+      
+      return {
+        id: e.id,
+        description: e.name || '', // Map name to description
+        category: e.category,
+        amount: parseFloat(e.amount),
+        dayOfMonth: dayOfMonth,
+        startDate: startDate,
+        paymentMethod: e.payment_method,
+      };
+    });
   },
 
   async create(expense: Omit<RecurringExpense, 'id'>): Promise<RecurringExpense> {
     const userId = await getUserId();
+    
+    // Map from frontend format to database format
+    // Frontend sends: description, dayOfMonth, startDate (YYYY-MM)
+    // Database expects: name, frequency, start_date (may need YYYY-MM-DD format)
+    // Store dayOfMonth in notes field since database schema uses name/frequency
+    const startDate = expense.startDate.length === 7 
+      ? `${expense.startDate}-01` // Convert YYYY-MM to YYYY-MM-DD if needed
+      : expense.startDate;
+    
     const { data, error } = await supabase
       .from('recurring_expenses')
       .insert({
         user_id: userId,
-        name: expense.name,
+        name: expense.description, // Map description to name
         category: expense.category,
         amount: expense.amount,
-        frequency: expense.frequency,
-        start_date: expense.startDate,
-        end_date: expense.endDate,
-        notes: expense.notes,
+        frequency: 'monthly', // dayOfMonth implies monthly frequency
+        start_date: startDate,
+        end_date: null, // Not provided by frontend
+        notes: `dayOfMonth:${expense.dayOfMonth}`, // Store dayOfMonth in notes
         payment_method: expense.paymentMethod,
       })
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error creating recurring expense:', error);
+      throw error;
+    }
+    
+    // Extract dayOfMonth from notes or use the value we sent
+    let dayOfMonth = expense.dayOfMonth;
+    if (data.notes && data.notes.includes('dayOfMonth:')) {
+      const match = data.notes.match(/dayOfMonth:(\d+)/);
+      if (match) dayOfMonth = parseInt(match[1], 10);
+    }
+    
+    // Convert start_date from YYYY-MM-DD to YYYY-MM if needed
+    let formattedStartDate = data.start_date;
+    if (formattedStartDate && formattedStartDate.length === 10) {
+      formattedStartDate = formattedStartDate.substring(0, 7); // Extract YYYY-MM from YYYY-MM-DD
+    }
+    
     return {
       id: data.id,
-      name: data.name,
+      description: data.name || '', // Map name back to description
       category: data.category,
       amount: parseFloat(data.amount),
-      frequency: data.frequency as 'daily' | 'weekly' | 'monthly',
-      startDate: data.start_date,
-      endDate: data.end_date,
-      notes: data.notes || '',
+      dayOfMonth: dayOfMonth,
+      startDate: formattedStartDate,
       paymentMethod: data.payment_method,
     };
   },

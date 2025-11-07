@@ -56,3 +56,12 @@ export interface SavingsGoal {
   category?: string; // Optional category to track savings from
   contributions?: SavingsContribution[]; // History of contributions
 }
+
+// Quick Note for fast expense capture
+export interface QuickNote {
+  id: string;
+  text: string;
+  createdAt: string; // ISO timestamp
+  processed: boolean; // Whether it's been converted to an expense
+  processedAt?: string; // When it was processed
+}

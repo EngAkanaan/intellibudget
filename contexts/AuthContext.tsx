@@ -10,6 +10,9 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resendVerificationEmail: (email: string) => Promise<void>;
+  updateProfile: (firstName: string, lastName: string) => Promise<void>;
+  updateEmail: (newEmail: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -132,8 +135,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) throw error;
   };
 
+  const updateProfile = async (firstName: string, lastName: string) => {
+    const { error } = await supabase.auth.updateUser({
+      data: {
+        first_name: firstName,
+        last_name: lastName,
+        full_name: `${firstName} ${lastName}`,
+      }
+    });
+    if (error) throw error;
+    // Refresh user data
+    const { data: { user: updatedUser } } = await supabase.auth.getUser();
+    setUser(updatedUser);
+  };
+
+  const updateEmail = async (newEmail: string) => {
+    const { error } = await supabase.auth.updateUser({
+      email: newEmail
+    });
+    if (error) throw error;
+    // Note: Supabase will send a confirmation email to the new address
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+    if (error) throw error;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut, resendVerificationEmail }}>
+    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut, resendVerificationEmail, updateProfile, updateEmail, updatePassword }}>
       {children}
     </AuthContext.Provider>
   );

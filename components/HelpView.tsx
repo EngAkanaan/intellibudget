@@ -10,7 +10,6 @@ import {
   BarChart3,
   Search,
   FileText,
-  Keyboard,
   Download,
   Save,
   Trash2,
@@ -68,14 +67,14 @@ const HelpView: React.FC = () => {
               <h3 className="font-semibold text-lg mb-2">First Steps</h3>
               <ol className="list-decimal list-inside space-y-2 text-gray-700 dark:text-gray-300">
                 <li>Set your monthly salary in the <strong>Monthly Details</strong> view</li>
-                <li>Add your first expense by clicking <strong>"Add Expense"</strong> or pressing <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+E</kbd></li>
+                <li>Add your first expense by clicking <strong>"Add Expense"</strong></li>
                 <li>Set budgets for categories in the <strong>Budgets & Categories</strong> view</li>
                 <li>Explore the <strong>Dashboard</strong> to see your financial overview</li>
               </ol>
             </div>
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
               <p className="text-sm text-blue-800 dark:text-blue-300">
-                <strong>💡 Tip:</strong> All your data is stored locally in your browser. Make sure to create backups regularly!
+                <strong>💡 Tip:</strong> Your data is securely stored in the cloud and synced across all your devices. Make sure to create backups regularly!
               </p>
             </div>
           </div>
@@ -93,7 +92,7 @@ const HelpView: React.FC = () => {
               </h3>
               <ol className="list-decimal list-inside space-y-2 text-gray-700 dark:text-gray-300">
                 <li>Go to <strong>Monthly Details</strong> view</li>
-                <li>Click <strong>"Add Expense"</strong> button or press <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+E</kbd></li>
+                <li>Click <strong>"Add Expense"</strong> button</li>
                 <li>Fill in:
                   <ul className="list-disc list-inside ml-6 mt-1">
                     <li><strong>Date:</strong> When the expense occurred</li>
@@ -304,40 +303,9 @@ const HelpView: React.FC = () => {
       </Card>
 
       <Card>
-        <SectionHeader id="shortcuts" icon={<Keyboard className="text-pink-500" size={24} />} title="Keyboard Shortcuts" />
-        {expandedSections.has('shortcuts') && (
-          <div className="p-6">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <span className="font-medium">Add Expense</span>
-                <kbd className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded font-mono">Ctrl+E</kbd>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <span className="font-medium">Close Modal</span>
-                <kbd className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded font-mono">Escape</kbd>
-              </div>
-            </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
-              Note: On Mac, use <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Cmd</kbd> instead of <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl</kbd>
-            </p>
-          </div>
-        )}
-      </Card>
-
-      <Card>
         <SectionHeader id="tips" icon={<AlertCircle className="text-blue-500" size={24} />} title="Tips & Best Practices" />
         {expandedSections.has('tips') && (
           <div className="p-6 space-y-4">
-            <div>
-              <h3 className="font-semibold text-lg mb-2">Data Storage</h3>
-              <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300">
-                <li>All data is stored locally in your browser's localStorage</li>
-                <li>Your data stays private on your device</li>
-                <li>No account or internet connection required</li>
-                <li>Data is tied to your browser/device</li>
-                <li><strong>Always backup your data regularly!</strong></li>
-              </ul>
-            </div>
             <div>
               <h3 className="font-semibold text-lg mb-2">Best Practices</h3>
               <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300">
@@ -362,7 +330,7 @@ const HelpView: React.FC = () => {
         <div className="p-6 text-center">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Need More Help?</h2>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Check the README.md file in the project repository for detailed technical documentation.
+            For additional support, please contact us through the app settings.
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-500">
             Happy Budgeting! 💰

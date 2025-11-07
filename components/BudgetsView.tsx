@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Card from './shared/Card';
 import type { MonthlyData } from '../types';
 import { PlusCircle, Trash2 } from 'lucide-react';
@@ -31,6 +31,20 @@ const BudgetsView: React.FC<BudgetsViewProps> = ({ categories, addCategory, dele
     const currentMonth = getCurrentMonth();
     const defaultMonth = data.find(m => m.month === currentMonth)?.month || data[data.length-1]?.month || '';
     const [selectedMonth, setSelectedMonth] = useState<string>(defaultMonth);
+    
+    // Local state for budget inputs to update UI immediately
+    const [localBudgets, setLocalBudgets] = useState<{ [category: string]: string }>({});
+    const debounceTimers = useRef<{ [key: string]: NodeJS.Timeout }>({});
+    
+    // Sync local budgets with prop budgets when selectedMonth changes
+    useEffect(() => {
+        const monthBudgets = budgets[selectedMonth] || {};
+        const local: { [category: string]: string } = {};
+        categories.forEach(cat => {
+            local[cat] = monthBudgets[cat] ? monthBudgets[cat].toString() : '';
+        });
+        setLocalBudgets(local);
+    }, [selectedMonth, budgets, categories]);
 
     const handleAddCategory = () => {
         if (newCategory.trim()) {
@@ -50,9 +64,32 @@ const BudgetsView: React.FC<BudgetsViewProps> = ({ categories, addCategory, dele
     }
     
     const handleBudgetChange = (category: string, value: string) => {
-        const amount = parseFloat(value) || 0;
-        setBudget(selectedMonth, category, amount);
+        // Update local state immediately for responsive UI
+        setLocalBudgets(prev => ({
+            ...prev,
+            [category]: value
+        }));
+        
+        // Clear existing debounce timer for this category
+        if (debounceTimers.current[category]) {
+            clearTimeout(debounceTimers.current[category]);
+        }
+        
+        // Debounce the API call - wait 800ms after user stops typing
+        debounceTimers.current[category] = setTimeout(() => {
+            const amount = parseFloat(value) || 0;
+            setBudget(selectedMonth, category, amount);
+        }, 800);
     };
+    
+    // Cleanup timers on unmount
+    useEffect(() => {
+        return () => {
+            Object.values(debounceTimers.current).forEach(timer => {
+                if (timer) clearTimeout(timer);
+            });
+        };
+    }, []);
 
     const handleAddPaymentMethod = () => {
         if (newPaymentMethod.trim()) {
@@ -127,10 +164,18 @@ const BudgetsView: React.FC<BudgetsViewProps> = ({ categories, addCategory, dele
                                     <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">$</span>
                                     <input
                                         type="number"
-                                        step="1"
+                                        step="0.01"
                                         placeholder="0.00"
-                                        value={currentMonthBudgets[cat] || ''}
+                                        value={localBudgets[cat] !== undefined ? localBudgets[cat] : (currentMonthBudgets[cat] || '')}
                                         onChange={(e) => handleBudgetChange(cat, e.target.value)}
+                                        onBlur={(e) => {
+                                            // Save immediately when user leaves the field
+                                            const amount = parseFloat(e.target.value) || 0;
+                                            if (debounceTimers.current[cat]) {
+                                                clearTimeout(debounceTimers.current[cat]);
+                                            }
+                                            setBudget(selectedMonth, cat, amount);
+                                        }}
                                         className="w-40 p-2 pl-7 rounded-md bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-right"
                                     />
                                 </div>
