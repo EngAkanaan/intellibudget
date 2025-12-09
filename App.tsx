@@ -290,8 +290,16 @@ const App: React.FC = () => {
             });
             return updated;
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error processing recurring income:', error);
+          // Log more details about the error
+          if (error?.message) {
+            console.error('Error message:', error.message);
+          }
+          if (error?.code) {
+            console.error('Error code:', error.code);
+          }
+          // Don't throw - just log the error so the app continues to work
         }
       }
     };
@@ -1155,7 +1163,7 @@ const App: React.FC = () => {
       className={`cursor-pointer flex items-center p-2 rounded-lg transition-all duration-200 ${
         activeView === view
           ? 'bg-blue-600 text-white shadow-lg'
-          : 'text-gray-400 hover:bg-gray-700 hover:text-white'
+          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white'
       }`}
       onClick={() => {
         setActiveView(view);
@@ -1221,15 +1229,24 @@ const App: React.FC = () => {
     <div className="flex min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 font-sans">
       {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/60 z-30 lg:hidden" />}
 
-      <nav className={`w-64 bg-gray-800 dark:bg-black flex flex-col fixed h-full shadow-2xl z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <nav className={`w-64 bg-gray-200 dark:bg-gray-700 flex flex-col fixed h-full shadow-2xl z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        {/* Close button - fixed position inside sidebar */}
+        <button 
+          onClick={() => setIsSidebarOpen(false)} 
+          className="absolute top-2 right-2 p-1.5 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 z-50 transition-colors"
+          aria-label="Close sidebar"
+        >
+          <X size={20} />
+        </button>
+        
         {/* Merged Header with Welcome */}
-        <div className="flex-shrink-0 p-3 border-b border-gray-700">
+        <div className="flex-shrink-0 p-3 border-b border-gray-300 dark:border-gray-600">
           <div className="flex items-center mb-2">
             <Wallet className="w-8 h-8 text-blue-500" />
-            <h1 className="text-xl font-bold ml-2 text-white">IntelliBudget</h1>
+            <h1 className="text-xl font-bold ml-2 text-gray-800 dark:text-white">IntelliBudget</h1>
           </div>
-          <div className="px-2 py-1.5 bg-gradient-to-r from-blue-700 to-blue-800 rounded-lg shadow-md">
-            <p className="text-[10px] text-blue-200 mb-0.5">Welcome back,</p>
+          <div className="px-2 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-md">
+            <p className="text-[10px] text-blue-100 mb-0.5">Welcome back,</p>
             <p className="text-xs text-white font-semibold truncate">
               {user.user_metadata?.full_name || user.user_metadata?.first_name || user.email?.split('@')[0] || 'User'}
             </p>
@@ -1252,13 +1269,13 @@ const App: React.FC = () => {
         </div>
         
         {/* Fixed Footer */}
-        <div className="flex-shrink-0 pt-2 border-t border-gray-700 px-3 pb-3">
+        <div className="flex-shrink-0 pt-2 border-t border-gray-300 dark:border-gray-600 px-3 pb-3">
           <LogoutButton />
           <div className="mt-2 space-y-2">
             {/* Copyright */}
-            <div className="text-center text-gray-400 text-[10px]">
+            <div className="text-center text-gray-600 dark:text-gray-400 text-[10px]">
               <p>&copy; {new Date().getFullYear()} IntelliBudget</p>
-              <p className="mt-0.5 text-gray-500 text-[9px]">Your smart finance companion.</p>
+              <p className="mt-0.5 text-gray-500 dark:text-gray-500 text-[9px]">Your smart finance companion.</p>
             </div>
           </div>
         </div>

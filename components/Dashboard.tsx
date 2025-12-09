@@ -71,7 +71,8 @@ const Dashboard: React.FC<DashboardProps> = ({ data, categoryColors }) => {
       }
       return sum + (month.salary || 0);
     }, 0);
-    const allExpenses = data.flatMap(month => month.expenses);
+    // Get all expenses from all months, filtering out any invalid expenses
+    const allExpenses = data.flatMap(month => month.expenses || []).filter(exp => exp && typeof exp.amount === 'number' && !isNaN(exp.amount));
     const totalExpenses = allExpenses.reduce((sum, expense) => sum + expense.amount, 0);
     const balance = totalIncome - totalExpenses;
     
