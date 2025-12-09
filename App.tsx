@@ -1281,11 +1281,14 @@ const App: React.FC = () => {
         </div>
       </nav>
       <main className={`flex-1 p-4 sm:p-8 overflow-y-auto transition-all duration-300 ${isSidebarOpen ? 'lg:ml-64' : 'lg:ml-0'}`}>
-        <div className="flex items-center mb-4">
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
-            {isSidebarOpen ? <X size={24}/> : <Menu size={24} />}
-          </button>
-        </div>
+        {/* Menu button to open sidebar (only show when sidebar is closed) */}
+        {!isSidebarOpen && (
+          <div className="mb-4">
+            <button onClick={() => setIsSidebarOpen(true)} className="p-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
+              <Menu size={24} />
+            </button>
+          </div>
+        )}
         {renderView()}
       </main>
       
