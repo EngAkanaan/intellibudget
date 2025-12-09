@@ -5,6 +5,7 @@ import ErrorBoundary from './components/shared/ErrorBoundary';
 import LoadingSpinner from './components/shared/LoadingSpinner';
 import { useAuth } from './contexts/AuthContext';
 import Auth from './components/Auth';
+import ResetPassword from './components/ResetPassword';
 import { supabase } from './lib/supabase';
 import { 
   monthlyDataApi, 
@@ -304,6 +305,25 @@ const App: React.FC = () => {
     </button>
   );
 
+  // Check if we're on the password reset page
+  const isPasswordResetPage = () => {
+    // Check URL path
+    if (window.location.pathname === '/reset-password') {
+      return true;
+    }
+    // Check URL hash for recovery token (Supabase adds this when redirecting from email)
+    // Format: #access_token=...&type=recovery&...
+    if (window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const type = hashParams.get('type');
+      const accessToken = hashParams.get('access_token');
+      if (type === 'recovery' && accessToken) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   // Show loading spinner only on initial auth check or first data load
   if (authLoading || (user && dataLoading && !dataLoaded)) {
     return (
@@ -311,6 +331,11 @@ const App: React.FC = () => {
         <LoadingSpinner size="lg" />
       </div>
     );
+  }
+
+  // Show ResetPassword component if on password reset page
+  if (isPasswordResetPage()) {
+    return <ResetPassword />;
   }
 
   // Show Auth component if not authenticated
