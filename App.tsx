@@ -79,8 +79,27 @@ const App: React.FC = () => {
           incomeSourcesApi.getRecurringTemplates().catch(() => []),
         ]);
         
-        // Set monthly data
-        setData(monthlyData.length > 0 ? monthlyData : initialData);
+        // Set monthly data - merge database data with all available months
+        // This ensures all months are always visible, not just months with data
+        if (monthlyData.length > 0) {
+          // Create a map of months from database
+          const dbMonthsMap = new Map(monthlyData.map(m => [m.month, m]));
+          
+          // Merge with initialData to ensure all months are present
+          const mergedData = initialData.map(initialMonth => {
+            const dbMonth = dbMonthsMap.get(initialMonth.month);
+            if (dbMonth) {
+              // Use database data if available
+              return dbMonth;
+            }
+            // Otherwise use initial empty month
+            return initialMonth;
+          });
+          
+          setData(mergedData);
+        } else {
+          setData(initialData);
+        }
         
         // Set categories and colors
         if (categoriesData.length > 0) {
