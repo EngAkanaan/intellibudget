@@ -535,9 +535,22 @@ const App: React.FC = () => {
           throw new Error('Recurring income requires recurringDayOfMonth and recurringStartDate');
         }
         if (!income.recurringId) {
+          // Generate a proper UUID for recurring_id (database expects UUID format)
+          const generateUUID = () => {
+            // Use crypto.randomUUID() if available (modern browsers)
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+              return crypto.randomUUID();
+            }
+            // Fallback UUID v4 generator
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+              const r = Math.random() * 16 | 0;
+              const v = c === 'x' ? r : (r & 0x3 | 0x8);
+              return v.toString(16);
+            });
+          };
           incomeWithRecurringId = { 
             ...income, 
-            recurringId: `recurring-${Date.now()}`,
+            recurringId: generateUUID(),
             recurringDayOfMonth: income.recurringDayOfMonth,
             recurringStartDate: income.recurringStartDate
           };
