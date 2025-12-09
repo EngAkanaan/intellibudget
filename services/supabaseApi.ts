@@ -801,5 +801,41 @@ export const incomeSourcesApi = {
     
     if (error) throw error;
   },
+
+  async getRecurringTemplates(): Promise<IncomeSource[]> {
+    const userId = await getUserId();
+    // Get unique recurring income templates (one per recurring_id)
+    const { data, error } = await supabase
+      .from('income_sources')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_recurring', true)
+      .not('recurring_id', 'is', null)
+      .order('created_at', { ascending: true });
+    
+    if (error) throw error;
+    
+    // Group by recurring_id and get the first one (template)
+    const templatesMap = new Map<string, any>();
+    data.forEach(i => {
+      const recurringId = i.recurring_id;
+      if (!templatesMap.has(recurringId)) {
+        templatesMap.set(recurringId, i);
+      }
+    });
+    
+    return Array.from(templatesMap.values()).map(i => ({
+      id: i.id,
+      description: i.description,
+      amount: parseFloat(i.amount),
+      date: i.date,
+      sourceType: i.source_type,
+      notes: i.notes || '',
+      isRecurring: i.is_recurring || false,
+      recurringDayOfMonth: i.recurring_day_of_month,
+      recurringStartDate: i.recurring_start_date,
+      recurringId: i.recurring_id,
+    }));
+  },
 };
 

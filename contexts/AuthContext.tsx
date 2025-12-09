@@ -10,6 +10,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resendVerificationEmail: (email: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   updateProfile: (firstName: string, lastName: string) => Promise<void>;
   updateEmail: (newEmail: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
@@ -135,6 +136,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) throw error;
   };
 
+  const resetPassword = async (email: string) => {
+    const redirectUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${redirectUrl}/reset-password`,
+    });
+    if (error) throw error;
+  };
+
   const updateProfile = async (firstName: string, lastName: string) => {
     const { error } = await supabase.auth.updateUser({
       data: {
@@ -165,7 +174,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut, resendVerificationEmail, updateProfile, updateEmail, updatePassword }}>
+    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut, resendVerificationEmail, resetPassword, updateProfile, updateEmail, updatePassword }}>
       {children}
     </AuthContext.Provider>
   );

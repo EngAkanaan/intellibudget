@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { initialData } from './services/mockData';
 import type { MonthlyData, Expense, RecurringExpense, SavingsGoal, RecurringExpenseTemplate, IncomeSource } from './types';
 import ErrorBoundary from './components/shared/ErrorBoundary';
@@ -49,10 +49,12 @@ const App: React.FC = () => {
   const [paymentMethodColors, setPaymentMethodColors] = useState<{[key: string]: string}>(INITIAL_PAYMENT_METHOD_COLORS);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [recurringTemplates, setRecurringTemplates] = useState<RecurringExpenseTemplate[]>([]);
+  const [recurringIncomeTemplates, setRecurringIncomeTemplates] = useState<IncomeSource[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const recurringIncomeProcessedRef = useRef<string>('');
 
   // --- ALL EFFECTS MUST BE BEFORE CONDITIONAL RETURNS ---
   // --- Effect to Load Data from Supabase when user logs in ---
@@ -65,7 +67,7 @@ const App: React.FC = () => {
         console.log('📥 Loading data from Supabase...');
         
         // Load all data in parallel
-        const [monthlyData, categoriesData, budgetsData, recurringData, paymentMethodsData, templatesData, goalsData] = await Promise.all([
+        const [monthlyData, categoriesData, budgetsData, recurringData, paymentMethodsData, templatesData, goalsData, recurringIncomeData] = await Promise.all([
           monthlyDataApi.getAll().catch(() => initialData),
           categoriesApi.getAll().catch(() => []),
           budgetsApi.getAll().catch(() => ({})),
@@ -73,6 +75,7 @@ const App: React.FC = () => {
           paymentMethodsApi.getAll().catch(() => []),
           recurringTemplatesApi.getAll().catch(() => []),
           savingsGoalsApi.getAll().catch(() => []),
+          incomeSourcesApi.getRecurringTemplates().catch(() => []),
         ]);
         
         // Set monthly data
@@ -108,6 +111,9 @@ const App: React.FC = () => {
         // Set savings goals
         setSavingsGoals(goalsData);
         
+        // Set recurring income templates
+        setRecurringIncomeTemplates(recurringIncomeData);
+        
         console.log('✅ Data loaded from Supabase');
         setDataLoaded(true); // Mark data as loaded to prevent re-loading
       } catch (error) {
@@ -135,6 +141,7 @@ const App: React.FC = () => {
       setPaymentMethodColors(INITIAL_PAYMENT_METHOD_COLORS);
       setSavingsGoals([]);
       setRecurringTemplates([]);
+      setRecurringIncomeTemplates([]);
     }
   }, [user]);
   
@@ -173,54 +180,104 @@ const App: React.FC = () => {
           }
         }
       });
-
-      // Process recurring income sources
-      const incomeSources = monthData.incomeSources || [];
-      incomeSources.forEach(income => {
-        if (income.isRecurring && income.recurringDayOfMonth && income.recurringStartDate) {
-          // Check if this month is on or after the start date
-          if (monthData.month >= income.recurringStartDate) {
-            const year = parseInt(monthData.month.split('-')[0]);
-            const month = parseInt(monthData.month.split('-')[1]);
-            const daysInMonth = new Date(year, month, 0).getDate();
-            
-            // Check if income for this day already exists
-            const day = Math.min(income.recurringDayOfMonth, daysInMonth);
-            const dayString = String(day).padStart(2, '0');
-            const expectedDate = `${monthData.month}-${dayString}`;
-            
-            const incomeExists = incomeSources.some(inc => 
-              inc.recurringId === income.recurringId && 
-              inc.date === expectedDate &&
-              inc.id !== income.id // Don't match the template itself
-            );
-            
-            // If income doesn't exist for this month, create it
-            if (!incomeExists) {
-              const newIncome: IncomeSource = {
-                id: `${income.recurringId || income.id}-${monthData.month}-${day}`,
-                description: income.description,
-                amount: income.amount,
-                date: expectedDate,
-                sourceType: income.sourceType,
-                notes: income.notes || '',
-                isRecurring: true,
-                recurringDayOfMonth: income.recurringDayOfMonth,
-                recurringStartDate: income.recurringStartDate,
-                recurringId: income.recurringId || income.id,
-              };
-              monthData.incomeSources = [...(monthData.incomeSources || []), newIncome];
-              needsUpdate = true;
-            }
-          }
-        }
-      });
     });
 
     if (needsUpdate) {
       setData(newData);
     }
   }, [user, recurringExpenses, data]);
+
+  // --- Effect to automatically process recurring income ---
+  useEffect(() => {
+    // Only process if user is authenticated and we have templates
+    if (!user || !dataLoaded || recurringIncomeTemplates.length === 0) return;
+
+    // Create a key to track if we've processed this combination
+    const processKey = `${dataLoaded}-${recurringIncomeTemplates.length}-${data.length}`;
+    if (recurringIncomeProcessedRef.current === processKey) return;
+    
+    recurringIncomeProcessedRef.current = processKey;
+
+    const processRecurringIncome = async () => {
+      const incomeToCreate: Array<{ template: IncomeSource; month: string; date: string }> = [];
+
+      // Collect all income entries that need to be created
+      data.forEach((monthData: MonthlyData) => {
+        recurringIncomeTemplates.forEach(template => {
+          if (template.recurringDayOfMonth && template.recurringStartDate && template.recurringId) {
+            // Check if this month is on or after the start date
+            if (monthData.month >= template.recurringStartDate) {
+              const year = parseInt(monthData.month.split('-')[0]);
+              const month = parseInt(monthData.month.split('-')[1]);
+              const daysInMonth = new Date(year, month, 0).getDate();
+              
+              // Calculate the day (adjust if day doesn't exist in month, e.g., day 31 in February)
+              const day = Math.min(template.recurringDayOfMonth, daysInMonth);
+              const dayString = String(day).padStart(2, '0');
+              const expectedDate = `${monthData.month}-${dayString}`;
+              
+              // Check if income for this recurring_id and date already exists
+              const incomeSources = monthData.incomeSources || [];
+              const incomeExists = incomeSources.some(inc => 
+                inc.recurringId === template.recurringId && 
+                inc.date === expectedDate
+              );
+              
+              // If income doesn't exist for this month, add it to the list to create
+              if (!incomeExists) {
+                incomeToCreate.push({
+                  template,
+                  month: monthData.month,
+                  date: expectedDate,
+                });
+              }
+            }
+          }
+        });
+      });
+
+      // Create all missing income entries in Supabase
+      if (incomeToCreate.length > 0) {
+        try {
+          const createdIncomes = await Promise.all(
+            incomeToCreate.map(({ template, month, date }) => {
+              const newIncome: Omit<IncomeSource, 'id'> = {
+                description: template.description,
+                amount: template.amount,
+                date,
+                sourceType: template.sourceType,
+                notes: template.notes || '',
+                isRecurring: true,
+                recurringDayOfMonth: template.recurringDayOfMonth!,
+                recurringStartDate: template.recurringStartDate!,
+                recurringId: template.recurringId!,
+              };
+              return incomeSourcesApi.create(newIncome, month);
+            })
+          );
+
+          // Update local state with all created incomes
+          setData(prevData => {
+            const updated = prevData.map(monthData => {
+              const monthIncomes = createdIncomes.filter(inc => inc.date.startsWith(monthData.month));
+              if (monthIncomes.length > 0) {
+                return {
+                  ...monthData,
+                  incomeSources: [...(monthData.incomeSources || []), ...monthIncomes],
+                };
+              }
+              return monthData;
+            });
+            return updated;
+          });
+        } catch (error) {
+          console.error('Error processing recurring income:', error);
+        }
+      }
+    };
+
+    processRecurringIncome();
+  }, [user, dataLoaded, recurringIncomeTemplates, data]);
 
   useEffect(() => {
     if (window.innerWidth < 1024) {

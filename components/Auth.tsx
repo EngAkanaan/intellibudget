@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Wallet, Mail, Lock, AlertCircle, Loader, User } from 'lucide-react';
+import { Wallet, Mail, Lock, AlertCircle, Loader, User, Key } from 'lucide-react';
 import Card from './shared/Card';
 
 const Auth: React.FC = () => {
@@ -14,7 +14,9 @@ const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
-  const { signIn, signUp, resendVerificationEmail } = useAuth();
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const { signIn, signUp, resendVerificationEmail, resetPassword } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,7 +185,70 @@ const Auth: React.FC = () => {
                 Password must be at least 6 characters
               </p>
             )}
+            {!isSignUp && (
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+              >
+                <Key size={14} />
+                Forgot Password?
+              </button>
+            )}
           </div>
+
+          {showForgotPassword && !isSignUp && (
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                Enter your email address and we'll send you a link to reset your password.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!resetEmail) {
+                      setError('Please enter your email address.');
+                      return;
+                    }
+                    try {
+                      setLoading(true);
+                      setError(null);
+                      await resetPassword(resetEmail);
+                      setMessage('📧 Password reset link sent! Check your email (including spam folder) to reset your password.');
+                      setShowForgotPassword(false);
+                      setResetEmail('');
+                    } catch (err: any) {
+                      setError(err.message || 'Failed to send reset email. Please try again.');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? <Loader className="animate-spin" size={16} /> : 'Send'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setResetEmail('');
+                    setError(null);
+                  }}
+                  className="px-4 py-2 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 font-medium rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           {isSignUp && (
             <div>
