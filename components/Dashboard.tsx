@@ -63,16 +63,44 @@ const Dashboard: React.FC<DashboardProps> = ({ data, categoryColors }) => {
   const [activeIndex, setActiveIndex] = React.useState(0);
 
   const summary = useMemo(() => {
+    // Get current month in YYYY-MM format
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = (now.getMonth() + 1).toString().padStart(2, '0');
+    const currentMonthString = `${currentYear}-${currentMonth}`;
+    
+    // Filter data to only include months up to and including current month
+    const monthsUpToCurrent = data.filter(monthData => monthData.month <= currentMonthString);
+    
     // Calculate total income from income sources, fallback to salary for backward compatibility
-    const totalIncome = data.reduce((sum, month) => {
+    // Only count income from months up to current month
+    const totalIncome = monthsUpToCurrent.reduce((sum, month) => {
       const incomeSources = month.incomeSources || [];
       if (incomeSources.length > 0) {
         return sum + incomeSources.reduce((monthSum, inc) => monthSum + inc.amount, 0);
       }
       return sum + (month.salary || 0);
     }, 0);
-    // Get all expenses from all months, filtering out any invalid expenses
-    const allExpenses = data.flatMap(month => month.expenses || []).filter(exp => exp && typeof exp.amount === 'number' && !isNaN(exp.amount));
+    
+    // Get all expenses from months up to current month
+    // Exclude recurring expenses that are in future months (projected expenses)
+    const allExpenses = monthsUpToCurrent.flatMap(monthData => {
+      const monthExpenses = monthData.expenses || [];
+      // Filter out invalid expenses and recurring expenses in future months
+      return monthExpenses.filter(exp => {
+        // Basic validation
+        if (!exp || typeof exp.amount !== 'number' || isNaN(exp.amount)) {
+          return false;
+        }
+        // If expense has a recurringId and the month is in the future, exclude it
+        // (recurring expenses in current/past months are fine - they're actual expenses)
+        if (exp.recurringId && monthData.month > currentMonthString) {
+          return false;
+        }
+        return true;
+      });
+    });
+    
     const totalExpenses = allExpenses.reduce((sum, expense) => sum + expense.amount, 0);
     const balance = totalIncome - totalExpenses;
     

@@ -292,19 +292,44 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpen
 
   const handleIncomeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedMonth || !incomeFormState.amount || !incomeFormState.description) return;
+    if (!selectedMonth || !incomeFormState.amount || !incomeFormState.description) {
+      alert('Please fill in all required fields (Description and Amount).');
+      return;
+    }
+
+    // Validate amount
+    const amount = parseFloat(incomeFormState.amount);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Amount must be a positive number.');
+      return;
+    }
+
+    // Validate recurring income fields if isRecurring is true
+    if (incomeFormState.isRecurring) {
+      if (!incomeFormState.recurringDayOfMonth || !incomeFormState.recurringStartDate) {
+        alert('Recurring income requires both Day of Month and Start Date.');
+        return;
+      }
+      const day = parseInt(incomeFormState.recurringDayOfMonth, 10);
+      if (isNaN(day) || day < 1 || day > 31) {
+        alert('Day of Month must be a number between 1 and 31.');
+        return;
+      }
+    }
 
     const incomeData: Omit<IncomeSource, 'id'> = {
-      description: incomeFormState.description,
-      amount: parseFloat(incomeFormState.amount),
+      description: incomeFormState.description.trim(),
+      amount: amount,
       date: incomeFormState.date,
       sourceType: incomeFormState.sourceType,
-      notes: incomeFormState.notes,
+      notes: incomeFormState.notes || '',
       isRecurring: incomeFormState.isRecurring,
       recurringDayOfMonth: incomeFormState.isRecurring && incomeFormState.recurringDayOfMonth 
         ? parseInt(incomeFormState.recurringDayOfMonth, 10) 
         : undefined,
-      recurringStartDate: incomeFormState.isRecurring ? incomeFormState.recurringStartDate : undefined,
+      recurringStartDate: incomeFormState.isRecurring && incomeFormState.recurringStartDate
+        ? incomeFormState.recurringStartDate
+        : undefined,
     };
 
     if (editingIncome) {

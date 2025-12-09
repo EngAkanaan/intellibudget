@@ -727,21 +727,34 @@ export const incomeSourcesApi = {
 
   async create(income: Omit<IncomeSource, 'id'>, month: string): Promise<IncomeSource> {
     const userId = await getUserId();
+    
+    // Prepare insert data, handling null/undefined values properly
+    const insertData: any = {
+      user_id: userId,
+      month,
+      description: income.description,
+      amount: income.amount,
+      date: income.date,
+      source_type: income.sourceType,
+      notes: income.notes || '',
+      is_recurring: income.isRecurring || false,
+    };
+    
+    // Only include recurring fields if income is recurring
+    if (income.isRecurring) {
+      insertData.recurring_day_of_month = income.recurringDayOfMonth || null;
+      insertData.recurring_start_date = income.recurringStartDate || null;
+      insertData.recurring_id = income.recurringId || null;
+    } else {
+      // Explicitly set to null for non-recurring income
+      insertData.recurring_day_of_month = null;
+      insertData.recurring_start_date = null;
+      insertData.recurring_id = null;
+    }
+    
     const { data, error } = await supabase
       .from('income_sources')
-      .insert({
-        user_id: userId,
-        month,
-        description: income.description,
-        amount: income.amount,
-        date: income.date,
-        source_type: income.sourceType,
-        notes: income.notes || '',
-        is_recurring: income.isRecurring || false,
-        recurring_day_of_month: income.recurringDayOfMonth,
-        recurring_start_date: income.recurringStartDate,
-        recurring_id: income.recurringId,
-      })
+      .insert(insertData)
       .select()
       .single();
     

@@ -523,10 +523,34 @@ const App: React.FC = () => {
   // Income Sources Management
   const addIncomeSource = async (month: string, income: Omit<IncomeSource, 'id'>) => {
     try {
-      // If recurring, generate a recurringId for tracking
-      const incomeWithRecurringId = income.isRecurring && !income.recurringId
-        ? { ...income, recurringId: `recurring-${Date.now()}` }
-        : income;
+      // Validate required fields
+      if (!income.description || !income.amount || !income.date) {
+        throw new Error('Missing required fields: description, amount, or date');
+      }
+
+      // If recurring, validate recurring fields and generate a recurringId for tracking
+      let incomeWithRecurringId = income;
+      if (income.isRecurring) {
+        if (!income.recurringDayOfMonth || !income.recurringStartDate) {
+          throw new Error('Recurring income requires recurringDayOfMonth and recurringStartDate');
+        }
+        if (!income.recurringId) {
+          incomeWithRecurringId = { 
+            ...income, 
+            recurringId: `recurring-${Date.now()}`,
+            recurringDayOfMonth: income.recurringDayOfMonth,
+            recurringStartDate: income.recurringStartDate
+          };
+        }
+      } else {
+        // For non-recurring income, ensure recurring fields are null/undefined
+        incomeWithRecurringId = {
+          ...income,
+          recurringDayOfMonth: undefined,
+          recurringStartDate: undefined,
+          recurringId: undefined
+        };
+      }
 
       const newIncome = await incomeSourcesApi.create(incomeWithRecurringId, month);
       
@@ -598,9 +622,11 @@ const App: React.FC = () => {
           })
         );
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding income source:', error);
-      alert('Failed to add income source. Please try again.');
+      // Provide more specific error message
+      const errorMessage = error?.message || error?.error?.message || 'Unknown error occurred';
+      alert(`Failed to add income source: ${errorMessage}. Please check the console for details.`);
     }
   };
 
