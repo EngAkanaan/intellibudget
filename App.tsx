@@ -307,20 +307,35 @@ const App: React.FC = () => {
 
   // Check if we're on the password reset page
   const isPasswordResetPage = () => {
-    // Check URL path
-    if (window.location.pathname === '/reset-password') {
-      return true;
-    }
     // Check URL hash for recovery token (Supabase adds this when redirecting from email)
-    // Format: #access_token=...&type=recovery&...
+    // Format: #access_token=...&type=recovery&... or #reset-password#access_token=...
     if (window.location.hash) {
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const hash = window.location.hash.substring(1);
+      const hashParams = new URLSearchParams(hash);
       const type = hashParams.get('type');
       const accessToken = hashParams.get('access_token');
+      
+      // Check if it's a recovery token
       if (type === 'recovery' && accessToken) {
         return true;
       }
+      
+      // Also check if hash contains reset-password (for our custom redirect)
+      if (hash.includes('reset-password')) {
+        // Extract the actual token part if it's nested
+        const tokenPart = hash.split('#').pop() || hash;
+        const tokenParams = new URLSearchParams(tokenPart);
+        if (tokenParams.get('type') === 'recovery' && tokenParams.get('access_token')) {
+          return true;
+        }
+      }
     }
+    
+    // Also check URL path (for direct navigation or server-side routing)
+    if (window.location.pathname === '/reset-password') {
+      return true;
+    }
+    
     return false;
   };
 

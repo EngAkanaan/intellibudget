@@ -137,6 +137,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetPassword = async (email: string) => {
+    // Redirect to base URL - Supabase will add the recovery token in the hash
+    // The vercel.json rewrite will ensure all routes go to index.html (SPA fallback)
     const redirectUrl = import.meta.env.VITE_APP_URL || window.location.origin;
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${redirectUrl}/reset-password`,

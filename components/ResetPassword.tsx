@@ -17,26 +17,23 @@ const ResetPassword: React.FC = () => {
     const checkResetToken = async () => {
       try {
         // Check URL hash for recovery token (Supabase adds this when redirecting from email)
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        // Format: #access_token=...&type=recovery&refresh_token=...
+        let hash = window.location.hash.substring(1);
+        
+        // If hash is empty, try to get it from the full URL
+        if (!hash && window.location.href.includes('#')) {
+          hash = window.location.href.split('#')[1] || '';
+        }
+        
+        const hashParams = new URLSearchParams(hash);
         const type = hashParams.get('type');
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
         
         if (type === 'recovery' && accessToken) {
           // Exchange the recovery token for a session
-          // Supabase automatically handles this when we call getSession() after the redirect
-          // But we need to make sure the session is set
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-          
-          if (sessionError) {
-            console.error('Session error:', sessionError);
-            setIsValidToken(false);
-            setError('Invalid or expired reset link. Please request a new password reset.');
-            return;
-          }
-          
-          // If we have tokens in the URL but no session, try to set the session
-          if (!session && accessToken && refreshToken) {
+          // First try to set the session with the tokens from the URL
+          if (accessToken && refreshToken) {
             const { error: setSessionError } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken,
@@ -44,15 +41,26 @@ const ResetPassword: React.FC = () => {
             
             if (setSessionError) {
               console.error('Set session error:', setSessionError);
+              // If setting session fails, the token might be expired
               setIsValidToken(false);
               setError('Invalid or expired reset link. Please request a new password reset.');
               return;
             }
           }
           
+          // Verify we have a valid session now
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          
+          if (sessionError || !session) {
+            console.error('Session error:', sessionError);
+            setIsValidToken(false);
+            setError('Invalid or expired reset link. Please request a new password reset.');
+            return;
+          }
+          
           setIsValidToken(true);
         } else {
-          // Check if we already have a valid session (might be in recovery mode)
+          // Check if we already have a valid session (might already be in recovery mode)
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
             setIsValidToken(true);
