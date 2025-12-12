@@ -95,10 +95,12 @@ export const expensesApi = {
   },
 
   async delete(id: string): Promise<void> {
+    const userId = await getUserId();
     const { error } = await supabase
       .from('expenses')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', userId);
     
     if (error) throw error;
   },
@@ -490,10 +492,12 @@ export const recurringExpensesApi = {
   },
 
   async delete(id: string): Promise<void> {
+    const userId = await getUserId();
     const { error } = await supabase
       .from('recurring_expenses')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', userId);
     
     if (error) throw error;
   },
@@ -552,10 +556,12 @@ export const recurringTemplatesApi = {
   },
 
   async delete(id: string): Promise<void> {
+    const userId = await getUserId();
     const { error } = await supabase
       .from('recurring_templates')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', userId);
     
     if (error) throw error;
   },
@@ -660,10 +666,12 @@ export const savingsGoalsApi = {
   },
 
   async delete(id: string): Promise<void> {
+    const userId = await getUserId();
     const { error } = await supabase
       .from('savings_goals')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', userId);
     
     if (error) throw error;
   },
@@ -807,10 +815,12 @@ export const incomeSourcesApi = {
   },
 
   async delete(id: string): Promise<void> {
+    const userId = await getUserId();
     const { error } = await supabase
       .from('income_sources')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', userId);
     
     if (error) throw error;
   },

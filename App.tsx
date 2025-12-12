@@ -237,14 +237,16 @@ const App: React.FC = () => {
               const expectedDate = `${monthData.month}-${dayString}`;
               
               // Check if income for this recurring_id and date already exists
+              // Check both local state and database to prevent recreating deleted entries
               const incomeSources = monthData.incomeSources || [];
-              const incomeExists = incomeSources.some(inc => 
+              const incomeExistsInLocal = incomeSources.some(inc => 
                 inc.recurringId === template.recurringId && 
                 inc.date === expectedDate
               );
               
-              // If income doesn't exist for this month, add it to the list to create
-              if (!incomeExists) {
+              // If income doesn't exist in local state, add it to the list to create
+              // (We'll verify it doesn't exist in database when we create it)
+              if (!incomeExistsInLocal) {
                 incomeToCreate.push({
                   template,
                   month: monthData.month,
@@ -257,10 +259,29 @@ const App: React.FC = () => {
       });
 
       // Create all missing income entries in Supabase
+      // First, verify they don't exist in database to prevent duplicates
       if (incomeToCreate.length > 0) {
         try {
+          // Check database for existing income entries before creating
+          const existingIncomes = await Promise.all(
+            incomeToCreate.map(({ month }) => incomeSourcesApi.getByMonth(month))
+          );
+          
+          // Filter out entries that already exist in database
+          const incomeToCreateFiltered = incomeToCreate.filter(({ template, month, date }, index) => {
+            const monthIncomes = existingIncomes[index] || [];
+            return !monthIncomes.some(inc => 
+              inc.recurringId === template.recurringId && 
+              inc.date === date
+            );
+          });
+          
+          if (incomeToCreateFiltered.length === 0) {
+            return; // All entries already exist in database
+          }
+          
           const createdIncomes = await Promise.all(
-            incomeToCreate.map(({ template, month, date }) => {
+            incomeToCreateFiltered.map(({ template, month, date }) => {
               const newIncome: Omit<IncomeSource, 'id'> = {
                 description: template.description,
                 amount: template.amount,
@@ -281,9 +302,12 @@ const App: React.FC = () => {
             const updated = prevData.map(monthData => {
               const monthIncomes = createdIncomes.filter(inc => inc.date.startsWith(monthData.month));
               if (monthIncomes.length > 0) {
+                // Merge with existing, avoiding duplicates
+                const existingIds = new Set((monthData.incomeSources || []).map(i => i.id));
+                const newIncomes = monthIncomes.filter(inc => !existingIds.has(inc.id));
                 return {
                   ...monthData,
-                  incomeSources: [...(monthData.incomeSources || []), ...monthIncomes],
+                  incomeSources: [...(monthData.incomeSources || []), ...newIncomes],
                 };
               }
               return monthData;
@@ -666,7 +690,14 @@ const App: React.FC = () => {
 
   const deleteIncomeSource = async (month: string, incomeId: string) => {
     try {
+      // Get the income source before deleting to check if it's recurring
+      const monthData = data.find(m => m.month === month);
+      const incomeToDelete = monthData?.incomeSources?.find(i => i.id === incomeId);
+      
+      // Delete from database
       await incomeSourcesApi.delete(incomeId);
+      
+      // Update local state immediately
       setData(prevData =>
         prevData.map(monthlyData => {
           if (monthlyData.month === month) {
@@ -679,6 +710,27 @@ const App: React.FC = () => {
           return monthlyData;
         })
       );
+      
+      // If it was a recurring income, we need to prevent it from being recreated
+      // by updating the recurring income templates to exclude this specific entry
+      // However, if it's just one instance of a recurring income, we should allow
+      // future instances to be created. The issue is only if we delete ALL instances.
+      // For now, we'll reload the data to ensure consistency
+      if (incomeToDelete?.isRecurring && incomeToDelete?.recurringId) {
+        // Reload income sources for this month to ensure database state is correct
+        const updatedIncomeSources = await incomeSourcesApi.getByMonth(month);
+        setData(prevData =>
+          prevData.map(monthlyData => {
+            if (monthlyData.month === month) {
+              return {
+                ...monthlyData,
+                incomeSources: updatedIncomeSources,
+              };
+            }
+            return monthlyData;
+          })
+        );
+      }
     } catch (error) {
       console.error('Error deleting income source:', error);
       alert('Failed to delete income source. Please try again.');
