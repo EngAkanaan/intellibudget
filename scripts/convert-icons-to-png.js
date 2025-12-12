@@ -6,13 +6,18 @@
  * Requires: npm install sharp --save-dev
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Check if sharp is available
 let sharp;
 try {
-  sharp = require('sharp');
+  sharp = (await import('sharp')).default;
 } catch (e) {
   console.error('❌ Error: sharp package not found.');
   console.log('📦 Please install it with: npm install sharp --save-dev');
@@ -75,4 +80,3 @@ async function convertIcons() {
 }
 
 convertIcons().catch(console.error);
-
