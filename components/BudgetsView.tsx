@@ -46,10 +46,15 @@ const BudgetsView: React.FC<BudgetsViewProps> = ({ categories, addCategory, dele
         setLocalBudgets(local);
     }, [selectedMonth, budgets, categories]);
 
-    const handleAddCategory = () => {
+    const handleAddCategory = async () => {
         if (newCategory.trim()) {
-            addCategory(newCategory.trim());
-            setNewCategory('');
+            try {
+                await addCategory(newCategory.trim());
+                setNewCategory('');
+            } catch (error) {
+                console.error('Error adding category:', error);
+                // Error is already handled in addCategory function
+            }
         }
     };
 
@@ -91,10 +96,15 @@ const BudgetsView: React.FC<BudgetsViewProps> = ({ categories, addCategory, dele
         };
     }, []);
 
-    const handleAddPaymentMethod = () => {
+    const handleAddPaymentMethod = async () => {
         if (newPaymentMethod.trim()) {
-            addPaymentMethod(newPaymentMethod.trim());
-            setNewPaymentMethod('');
+            try {
+                await addPaymentMethod(newPaymentMethod.trim());
+                setNewPaymentMethod('');
+            } catch (error) {
+                console.error('Error adding payment method:', error);
+                // Error is already handled in addPaymentMethod function
+            }
         }
     };
 

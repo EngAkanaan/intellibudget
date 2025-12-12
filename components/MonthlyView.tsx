@@ -159,23 +159,34 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpen
     setFormState(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedMonth || !formState.amount) return;
 
+    const amount = parseFloat(formState.amount);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+
     const expenseData = {
       ...formState,
-      amount: parseFloat(formState.amount),
+      amount,
       date: formState.date.includes(selectedMonth) ? formState.date : `${selectedMonth}-${formState.date.split('-')[2]}`,
       paymentMethod: formState.paymentMethod || undefined,
     };
 
-    if (editingExpense) {
-      updateExpense(selectedMonth, { ...expenseData, id: editingExpense.id });
-    } else {
-      addExpense(selectedMonth, expenseData);
+    try {
+      if (editingExpense) {
+        await updateExpense(selectedMonth, { ...expenseData, id: editingExpense.id });
+      } else {
+        await addExpense(selectedMonth, expenseData);
+      }
+      closeModal();
+    } catch (error) {
+      console.error('Error saving expense:', error);
+      // Error is already handled in addExpense/updateExpense functions
     }
-    closeModal();
   };
   
   const handleDelete = (expenseId: string) => {
@@ -290,7 +301,7 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpen
     }
   };
 
-  const handleIncomeSubmit = (e: React.FormEvent) => {
+  const handleIncomeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedMonth || !incomeFormState.amount || !incomeFormState.description) {
       alert('Please fill in all required fields (Description and Amount).');
@@ -332,12 +343,17 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpen
         : undefined,
     };
 
-    if (editingIncome) {
-      updateIncomeSource(selectedMonth, { ...incomeData, id: editingIncome.id });
-    } else {
-      addIncomeSource(selectedMonth, incomeData);
+    try {
+      if (editingIncome) {
+        await updateIncomeSource(selectedMonth, { ...incomeData, id: editingIncome.id });
+      } else {
+        await addIncomeSource(selectedMonth, incomeData);
+      }
+      closeIncomeModal();
+    } catch (error) {
+      console.error('Error saving income:', error);
+      // Error is already handled in addIncomeSource/updateIncomeSource functions
     }
-    closeIncomeModal();
   };
 
   const handleDeleteIncome = (incomeId: string) => {

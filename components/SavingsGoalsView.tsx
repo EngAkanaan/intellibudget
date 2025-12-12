@@ -9,6 +9,7 @@ interface SavingsGoalsViewProps {
   addSavingsGoal: (goal: Omit<SavingsGoal, 'id'>) => void;
   updateSavingsGoal: (goal: SavingsGoal) => void;
   deleteSavingsGoal: (id: string) => void;
+  addContribution: (goalId: string, contribution: { amount: number; date: string; notes?: string }) => void;
   categories: string[];
 }
 
@@ -17,6 +18,7 @@ const SavingsGoalsView: React.FC<SavingsGoalsViewProps> = ({
   addSavingsGoal,
   updateSavingsGoal,
   deleteSavingsGoal,
+  addContribution,
   categories,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -66,22 +68,46 @@ const SavingsGoalsView: React.FC<SavingsGoalsViewProps> = ({
     setEditingGoal(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formState.name || !formState.targetAmount || !formState.targetDate) {
+      alert('Please fill in all required fields (Name, Target Amount, and Target Date).');
+      return;
+    }
+
+    const targetAmount = parseFloat(formState.targetAmount);
+    const currentAmount = parseFloat(formState.currentAmount || '0');
+    
+    if (isNaN(targetAmount) || targetAmount <= 0) {
+      alert('Target amount must be a positive number.');
+      return;
+    }
+    
+    if (isNaN(currentAmount) || currentAmount < 0) {
+      alert('Current amount must be a non-negative number.');
+      return;
+    }
+
     const goalData = {
-      name: formState.name,
-      targetAmount: parseFloat(formState.targetAmount),
-      currentAmount: parseFloat(formState.currentAmount),
+      name: formState.name.trim(),
+      targetAmount,
+      currentAmount,
       targetDate: formState.targetDate,
       category: formState.category || undefined,
     };
 
-    if (editingGoal) {
-      updateSavingsGoal({ ...goalData, id: editingGoal.id });
-    } else {
-      addSavingsGoal(goalData);
+    try {
+      if (editingGoal) {
+        await updateSavingsGoal({ ...goalData, id: editingGoal.id, contributions: editingGoal.contributions || [] });
+      } else {
+        await addSavingsGoal(goalData);
+      }
+      closeModal();
+    } catch (error) {
+      console.error('Error saving goal:', error);
+      // Error is already handled in addSavingsGoal/updateSavingsGoal functions
     }
-    closeModal();
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -99,33 +125,34 @@ const SavingsGoalsView: React.FC<SavingsGoalsViewProps> = ({
     setIsContributionModalOpen(true);
   };
 
-  const handleContributionSubmit = (e: React.FormEvent) => {
+  const handleContributionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedGoal || !contributionForm.amount) return;
 
     const contributionAmount = parseFloat(contributionForm.amount);
-    const newContribution: SavingsContribution = {
-      id: `contrib-${Date.now()}`,
-      goalId: selectedGoal.id,
-      amount: contributionAmount,
-      date: contributionForm.date,
-      notes: contributionForm.notes || undefined,
-    };
+    if (isNaN(contributionAmount) || contributionAmount <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
 
-    const updatedGoal: SavingsGoal = {
-      ...selectedGoal,
-      currentAmount: selectedGoal.currentAmount + contributionAmount,
-      contributions: [...(selectedGoal.contributions || []), newContribution],
-    };
-
-    updateSavingsGoal(updatedGoal);
-    setIsContributionModalOpen(false);
-    setSelectedGoal(null);
-    setContributionForm({
-      amount: '',
-      date: new Date().toISOString().split('T')[0],
-      notes: '',
-    });
+    try {
+      await addContribution(selectedGoal.id, {
+        amount: contributionAmount,
+        date: contributionForm.date,
+        notes: contributionForm.notes || undefined,
+      });
+      
+      setIsContributionModalOpen(false);
+      setSelectedGoal(null);
+      setContributionForm({
+        amount: '',
+        date: new Date().toISOString().split('T')[0],
+        notes: '',
+      });
+    } catch (error) {
+      console.error('Error adding contribution:', error);
+      // Error is already handled in the addContribution function
+    }
   };
 
   const openHistoryModal = (goal: SavingsGoal) => {

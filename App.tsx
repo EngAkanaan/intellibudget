@@ -1112,11 +1112,28 @@ const App: React.FC = () => {
 
   const updateSavingsGoal = async (goal: SavingsGoal) => {
     try {
-      await savingsGoalsApi.update(goal.id, goal);
-      setSavingsGoals(prev => prev.map(g => g.id === goal.id ? goal : g));
+      const updatedGoal = await savingsGoalsApi.update(goal.id, goal);
+      // Preserve existing contributions when updating
+      setSavingsGoals(prev => prev.map(g => 
+        g.id === goal.id 
+          ? { ...updatedGoal, contributions: goal.contributions || g.contributions || [] }
+          : g
+      ));
     } catch (error) {
       console.error('Error updating savings goal:', error);
       alert('Failed to update savings goal. Please try again.');
+    }
+  };
+
+  const addContribution = async (goalId: string, contribution: { amount: number; date: string; notes?: string }) => {
+    try {
+      await savingsGoalsApi.addContribution(goalId, contribution);
+      // Reload all goals to get updated data
+      const updatedGoals = await savingsGoalsApi.getAll();
+      setSavingsGoals(updatedGoals);
+    } catch (error) {
+      console.error('Error adding contribution:', error);
+      alert('Failed to add contribution. Please try again.');
     }
   };
 
@@ -1232,7 +1249,7 @@ const App: React.FC = () => {
       case 'recurring':
           return <RecurringView recurringExpenses={recurringExpenses} addRecurringExpense={addRecurringExpense} deleteRecurringExpense={deleteRecurringExpense} categories={categories} paymentMethods={paymentMethods} templates={recurringTemplates} addTemplate={addRecurringTemplate} deleteTemplate={deleteRecurringTemplate} />;
         case 'savings':
-          return <SavingsGoalsView savingsGoals={savingsGoals} addSavingsGoal={addSavingsGoal} updateSavingsGoal={updateSavingsGoal} deleteSavingsGoal={deleteSavingsGoal} categories={categories} />;
+          return <SavingsGoalsView savingsGoals={savingsGoals} addSavingsGoal={addSavingsGoal} updateSavingsGoal={updateSavingsGoal} deleteSavingsGoal={deleteSavingsGoal} addContribution={addContribution} categories={categories} />;
         case 'settings':
           return <ProfileSettingsView onExport={handleExport} onClearAll={handleClearAll} onBackup={handleBackup} onRestore={handleRestore} />;
         case 'quicknotes':

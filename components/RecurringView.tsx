@@ -30,7 +30,7 @@ const RecurringView: React.FC<RecurringViewProps> = ({ recurringExpenses, addRec
         setFormState(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formState.description || !formState.amount || !formState.dayOfMonth) {
             alert('Please fill out all fields.');
@@ -43,24 +43,35 @@ const RecurringView: React.FC<RecurringViewProps> = ({ recurringExpenses, addRec
             return;
         }
 
-        addRecurringExpense({
-            description: formState.description,
-            amount: parseFloat(formState.amount),
-            category: formState.category as ExpenseCategory,
-            dayOfMonth: day,
-            startDate: formState.startDate,
-            paymentMethod: formState.paymentMethod || undefined,
-        });
+        const amount = parseFloat(formState.amount);
+        if (isNaN(amount) || amount <= 0) {
+            alert('Amount must be a positive number.');
+            return;
+        }
 
-        // Reset form
-        setFormState({
-            description: '',
-            amount: '',
-            category: categories[0] || 'Other',
-            dayOfMonth: '1',
-            startDate: new Date().toISOString().slice(0, 7),
-            paymentMethod: paymentMethods[0] || '',
-        });
+        try {
+            await addRecurringExpense({
+                description: formState.description.trim(),
+                amount,
+                category: formState.category as ExpenseCategory,
+                dayOfMonth: day,
+                startDate: formState.startDate,
+                paymentMethod: formState.paymentMethod || undefined,
+            });
+
+            // Reset form only on success
+            setFormState({
+                description: '',
+                amount: '',
+                category: categories[0] || 'Other',
+                dayOfMonth: '1',
+                startDate: new Date().toISOString().slice(0, 7),
+                paymentMethod: paymentMethods[0] || '',
+            });
+        } catch (error) {
+            console.error('Error adding recurring expense:', error);
+            // Error is already handled in addRecurringExpense function
+        }
     };
 
     const handleSaveAsTemplate = () => {
