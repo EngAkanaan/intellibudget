@@ -825,6 +825,41 @@ export const incomeSourcesApi = {
     if (error) throw error;
   },
 
+  // Delete all instances of a recurring income series from `fromMonth` onwards,
+  // then strip the recurring metadata from any past rows so that
+  // getRecurringTemplates() no longer returns them as active templates.
+  // Without step 2, processRecurringIncome() would find a past row, treat it
+  // as a live template, and recreate the deleted future entries.
+  async deleteRecurringFromMonth(recurringId: string, fromMonth: string): Promise<void> {
+    const userId = await getUserId();
+
+    // Step 1: delete this month + all future months
+    const { error: deleteError } = await supabase
+      .from('income_sources')
+      .delete()
+      .eq('user_id', userId)
+      .eq('recurring_id', recurringId)
+      .gte('month', fromMonth);
+
+    if (deleteError) throw deleteError;
+
+    // Step 2: strip recurring metadata from past rows so they are no longer
+    // treated as templates (they become plain one-time income entries).
+    const { error: updateError } = await supabase
+      .from('income_sources')
+      .update({
+        recurring_id: null,
+        is_recurring: false,
+        recurring_day_of_month: null,
+        recurring_start_date: null,
+      })
+      .eq('user_id', userId)
+      .eq('recurring_id', recurringId)
+      .lt('month', fromMonth);
+
+    if (updateError) throw updateError;
+  },
+
   async getRecurringTemplates(): Promise<IncomeSource[]> {
     const userId = await getUserId();
     // Get unique recurring income templates (one per recurring_id)

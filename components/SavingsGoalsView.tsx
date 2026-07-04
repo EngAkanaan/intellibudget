@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Card from './shared/Card';
 import type { SavingsGoal, SavingsContribution } from '../types';
-import { PlusCircle, Trash2, Target, TrendingUp, DollarSign, X, History } from 'lucide-react';
+import { PlusCircle, Trash2, Target, TrendingUp, DollarSign, X, History, Bell, BellOff } from 'lucide-react';
 import { formatCurrency, formatDate } from '../utils/formatters';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 interface SavingsGoalsViewProps {
   savingsGoals: SavingsGoal[];
@@ -13,6 +14,8 @@ interface SavingsGoalsViewProps {
   categories: string[];
 }
 
+const MILESTONES = [25, 50, 75, 100];
+
 const SavingsGoalsView: React.FC<SavingsGoalsViewProps> = ({
   savingsGoals,
   addSavingsGoal,
@@ -21,6 +24,9 @@ const SavingsGoalsView: React.FC<SavingsGoalsViewProps> = ({
   addContribution,
   categories,
 }) => {
+  const { supported: notifSupported, permission: notifPermission, requestPermission, notify } =
+    usePushNotifications();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isContributionModalOpen, setIsContributionModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -125,7 +131,23 @@ const SavingsGoalsView: React.FC<SavingsGoalsViewProps> = ({
     setIsContributionModalOpen(true);
   };
 
-  const handleContributionSubmit = async (e: React.FormEvent) => {
+  const fireMilestoneNotification = (goal: SavingsGoal, prevAmount: number, newAmount: number) => {
+    if (notifPermission !== 'granted') return;
+    const prevPct = goal.targetAmount > 0 ? (prevAmount / goal.targetAmount) * 100 : 0;
+    const newPct = goal.targetAmount > 0 ? (newAmount / goal.targetAmount) * 100 : 0;
+    for (const milestone of MILESTONES) {
+      if (prevPct < milestone && newPct >= milestone) {
+        const body =
+          milestone === 100
+            ? `${goal.name} is 100% funded! Goal achieved!`
+            : `${goal.name} has reached ${milestone}% of its target.`;
+        notify('Savings Goal Milestone', body, '/');
+        break;
+      }
+    }
+  };
+
+  const handleContributionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedGoal || !contributionForm.amount) return;
 
@@ -135,24 +157,22 @@ const SavingsGoalsView: React.FC<SavingsGoalsViewProps> = ({
       return;
     }
 
-    try {
-      await addContribution(selectedGoal.id, {
-        amount: contributionAmount,
-        date: contributionForm.date,
-        notes: contributionForm.notes || undefined,
-      });
-      
-      setIsContributionModalOpen(false);
-      setSelectedGoal(null);
-      setContributionForm({
-        amount: '',
-        date: new Date().toISOString().split('T')[0],
-        notes: '',
-      });
-    } catch (error) {
-      console.error('Error adding contribution:', error);
-      // Error is already handled in the addContribution function
-    }
+    const updatedGoal: SavingsGoal = {
+      ...selectedGoal,
+      currentAmount: selectedGoal.currentAmount + contributionAmount,
+      contributions: [...(selectedGoal.contributions || []), newContribution],
+    };
+
+    updateSavingsGoal(updatedGoal);
+    fireMilestoneNotification(selectedGoal, selectedGoal.currentAmount, updatedGoal.currentAmount);
+
+    setIsContributionModalOpen(false);
+    setSelectedGoal(null);
+    setContributionForm({
+      amount: '',
+      date: new Date().toISOString().split('T')[0],
+      notes: '',
+    });
   };
 
   const openHistoryModal = (goal: SavingsGoal) => {
@@ -182,13 +202,31 @@ const SavingsGoalsView: React.FC<SavingsGoalsViewProps> = ({
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-4">
         <h1 className="text-4xl font-bold text-gray-800 dark:text-white">Savings Goals</h1>
-        <button
-          onClick={openAddModal}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md"
-        >
-          <PlusCircle className="mr-2" />
-          Add Goal
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {notifSupported && notifPermission !== 'granted' && (
+            <button
+              onClick={requestPermission}
+              title="Enable milestone notifications"
+              className="flex items-center gap-2 px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors shadow-md text-sm"
+            >
+              <Bell size={16} />
+              Enable Notifications
+            </button>
+          )}
+          {notifSupported && notifPermission === 'granted' && (
+            <span className="flex items-center gap-1 px-3 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg text-sm">
+              <Bell size={14} />
+              Notifications On
+            </span>
+          )}
+          <button
+            onClick={openAddModal}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md"
+          >
+            <PlusCircle className="mr-2" />
+            Add Goal
+          </button>
+        </div>
       </div>
 
       {goalsWithProgress.length === 0 ? (
@@ -219,7 +257,7 @@ const SavingsGoalsView: React.FC<SavingsGoalsViewProps> = ({
                   </button>
                   <button
                     onClick={() => {
-                      if (window.confirm(['Are you sure you want to delete this goal?'])) {
+                      if (window.confirm('Are you sure you want to delete this goal?')) {
                         deleteSavingsGoal(goal.id);
                       }
                     }}

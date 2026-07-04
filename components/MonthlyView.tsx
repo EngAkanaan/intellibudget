@@ -20,6 +20,7 @@ interface MonthlyViewProps {
   addIncomeSource: (month: string, income: Omit<IncomeSource, 'id'>) => void;
   updateIncomeSource: (month: string, income: IncomeSource) => void;
   deleteIncomeSource: (month: string, incomeId: string) => void;
+  deleteRecurringIncomeFromMonth: (recurringId: string, fromMonth: string) => void;
 }
 
 const BudgetProgressBar: React.FC<{ spent: number; budget: number; color: string }> = ({ spent, budget, color }) => {
@@ -62,7 +63,7 @@ const getCurrentMonth = (): string => {
   return `${year}-${month}`;
 };
 
-const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpense, deleteExpense, categories, categoryColors, budgets, updateSalary, paymentMethods = [], paymentMethodColors = {}, addIncomeSource, updateIncomeSource, deleteIncomeSource }) => {
+const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpense, deleteExpense, categories, categoryColors, budgets, updateSalary, paymentMethods = [], paymentMethodColors = {}, addIncomeSource, updateIncomeSource, deleteIncomeSource, deleteRecurringIncomeFromMonth }) => {
   // Get current month or fallback to last month in data if current month doesn't exist
   const currentMonth = getCurrentMonth();
   const defaultMonth = data.find(m => m.month === currentMonth)?.month || data[data.length - 1]?.month || '';
@@ -77,6 +78,8 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpen
   // State for income sources management
   const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
   const [editingIncome, setEditingIncome] = useState<IncomeSource | null>(null);
+  // Holds the income being considered for deletion; drives the delete-choice modal
+  const [deleteIncomeTarget, setDeleteIncomeTarget] = useState<IncomeSource | null>(null);
   const [incomeFormState, setIncomeFormState] = useState({
     description: '',
     amount: '',
@@ -356,9 +359,14 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpen
     }
   };
 
-  const handleDeleteIncome = (incomeId: string) => {
-    if (window.confirm('Are you sure you want to delete this income source?')) {
-      deleteIncomeSource(selectedMonth, incomeId);
+  const handleDeleteIncome = (income: IncomeSource) => {
+    if (income.recurringId) {
+      // Show the choice modal for recurring incomes
+      setDeleteIncomeTarget(income);
+    } else {
+      if (window.confirm('Are you sure you want to delete this income source?')) {
+        deleteIncomeSource(selectedMonth, income.id);
+      }
     }
   };
 
@@ -661,7 +669,7 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpen
                         <button onClick={() => openEditIncomeModal(income)} className="p-1 text-gray-400 hover:text-blue-500" title="Edit">
                           <Pencil size={14} />
                         </button>
-                        <button onClick={() => handleDeleteIncome(income.id)} className="p-1 text-gray-400 hover:text-red-500" title="Delete">
+                        <button onClick={() => handleDeleteIncome(income)} className="p-1 text-gray-400 hover:text-red-500" title="Delete">
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -1083,6 +1091,82 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ data, addExpense, updateExpen
               </button>
             </form>
           </Card>
+        </div>
+      )}
+
+      {/* Recurring income delete-choice modal */}
+      {deleteIncomeTarget && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="font-bold text-gray-900 dark:text-white">Delete Recurring Income</h3>
+              <button
+                onClick={() => setDeleteIncomeTarget(null)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Description */}
+            <div className="px-5 py-4">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white mb-0.5">
+                {deleteIncomeTarget.description} — {formatCurrency(deleteIncomeTarget.amount)}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Recurring on day {deleteIncomeTarget.recurringDayOfMonth} of each month
+              </p>
+            </div>
+
+            {/* Choices */}
+            <div className="px-5 pb-5 space-y-2">
+              {/* Option 1 – this month only */}
+              <button
+                onClick={() => {
+                  deleteIncomeSource(selectedMonth, deleteIncomeTarget.id);
+                  setDeleteIncomeTarget(null);
+                }}
+                className="w-full flex items-start gap-3 px-4 py-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 hover:bg-yellow-100 dark:hover:bg-yellow-900/40 text-left rounded-lg transition-colors"
+              >
+                <Calendar size={18} className="text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-300">This month only</p>
+                  <p className="text-xs text-yellow-700 dark:text-yellow-500 mt-0.5">
+                    Removes income from <strong>{selectedMonth}</strong>. Past and future months are untouched.
+                  </p>
+                </div>
+              </button>
+
+              {/* Option 2 – this month and all future months */}
+              <button
+                onClick={() => {
+                  if (deleteIncomeTarget.recurringId) {
+                    deleteRecurringIncomeFromMonth(deleteIncomeTarget.recurringId, selectedMonth);
+                  }
+                  setDeleteIncomeTarget(null);
+                }}
+                className="w-full flex items-start gap-3 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 hover:bg-red-100 dark:hover:bg-red-900/40 text-left rounded-lg transition-colors"
+              >
+                <Trash2 size={18} className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-red-800 dark:text-red-300">This month + all future months</p>
+                  <p className="text-xs text-red-700 dark:text-red-500 mt-0.5">
+                    Removes income from <strong>{selectedMonth}</strong> onwards. Past months are untouched.
+                  </p>
+                </div>
+              </button>
+
+              {/* Cancel */}
+              <button
+                onClick={() => setDeleteIncomeTarget(null)}
+                className="w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

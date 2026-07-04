@@ -71,11 +71,68 @@ export interface SavingsGoal {
   contributions?: SavingsContribution[]; // History of contributions
 }
 
-// Quick Note for fast expense capture
+// AI Budget Agent — action types (Phase 2+ will populate payloads)
+export type AgentActionType =
+  | 'createExpense'
+  | 'createIncome'
+  | 'createBudget'
+  | 'createCategory'
+  | 'createPaymentMethod'
+  | 'createRecurringPayment'
+  | 'createSavingGoal'
+  | 'createFinancialNote';
+
+export interface AgentAction {
+  type: AgentActionType;
+  payload: Record<string, unknown>;
+  missingFields?: string[];
+  confidence?: number;
+  warnings?: string[];
+  suggestions?: string[];
+}
+
+export type AgentNoteStatus = 'raw' | 'parsed' | 'needs_info' | 'applied' | 'failed';
+
+export interface AgentParseResult {
+  actions?: AgentAction[];
+  missingFields?: string[];
+  warnings?: string[];
+  suggestions?: string[];
+  summary?: string;
+}
+
+export type BudgetAgentIntent =
+  | 'auto'
+  | 'expense'
+  | 'income'
+  | 'budget'
+  | 'recurring'
+  | 'goal'
+  | 'category'
+  | 'payment_method'
+  | 'note';
+
+export interface BudgetAgentParseRequest {
+  noteText: string;
+  noteId?: string;
+  intent?: BudgetAgentIntent;
+}
+
+export interface BudgetAgentParseResponse {
+  actions: AgentAction[];
+  missingFields: string[];
+  warnings: string[];
+  suggestions: string[];
+  summary?: string;
+}
+
+// Quick Note — synced to agent_notes in Supabase when logged in
 export interface QuickNote {
   id: string;
   text: string;
   createdAt: string; // ISO timestamp
-  processed: boolean; // Whether it's been converted to an expense
-  processedAt?: string; // When it was processed
+  processed: boolean;
+  processedAt?: string;
+  agentStatus?: AgentNoteStatus;
+  agentResult?: AgentParseResult | null;
 }

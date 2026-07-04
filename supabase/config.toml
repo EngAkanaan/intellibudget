@@ -1,0 +1,4 @@
+# Supabase local/dev config. Link your project: supabase link --project-ref <ref>
+
+[functions.budget-agent-parse]
+verify_jwt = true
