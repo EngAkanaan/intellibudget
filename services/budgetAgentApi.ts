@@ -13,7 +13,14 @@ export const budgetAgentApi = {
     );
 
     if (error) {
-      throw new Error(error.message || 'Budget agent request failed');
+      // The Supabase client wraps non-2xx responses with a generic message.
+      // The real error is in the response body — extract it.
+      let message = error.message || 'Budget agent request failed';
+      try {
+        const body = await (error as { context?: Response }).context?.json();
+        if (body?.error) message = body.error;
+      } catch { /* ignore JSON parse failures */ }
+      throw new Error(message);
     }
 
     const payload = data as BudgetAgentParseResponse & { error?: string };
