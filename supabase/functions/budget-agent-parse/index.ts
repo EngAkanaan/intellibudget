@@ -303,7 +303,7 @@ Rules:
 - Amounts are numbers (no symbols in payload).`;
 }
 
-async function callGemini(
+async function callGeminiOnce(
   apiKey: string,
   options:
     | { mode: 'single'; prompt: string }
@@ -343,7 +343,7 @@ async function callGemini(
   if (!geminiRes.ok) {
     const errText = await geminiRes.text();
     console.error('Gemini API error:', geminiRes.status, errText);
-    throw new Error(`Gemini API failed (${geminiRes.status})`);
+    throw Object.assign(new Error(`Gemini API failed (${geminiRes.status})`), { status: geminiRes.status });
   }
 
   const geminiJson = await geminiRes.json();
@@ -363,6 +363,26 @@ async function callGemini(
   }
 
   return normalizeParseResult(parsed);
+}
+
+async function callGemini(
+  apiKey: string,
+  options:
+    | { mode: 'single'; prompt: string }
+    | { mode: 'multi'; systemInstruction: string; history: ConversationMessage[]; noteText: string }
+): Promise<ParseResponse> {
+  try {
+    return await callGeminiOnce(apiKey, options);
+  } catch (err) {
+    // Retry once after a short delay on rate-limit (429) or server errors (5xx)
+    const status = (err as { status?: number }).status;
+    if (status === 429 || (status !== undefined && status >= 500)) {
+      const delay = status === 429 ? 4000 : 1500;
+      await new Promise((r) => setTimeout(r, delay));
+      return await callGeminiOnce(apiKey, options);
+    }
+    throw err;
+  }
 }
 
 function deriveAgentStatus(result: ParseResponse): string {

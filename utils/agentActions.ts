@@ -85,7 +85,9 @@ export async function executeAction(action: AgentAction, cb: AgentCallbacks): Pr
 export function friendlyError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.includes('GEMINI_API_KEY'))
-    return 'AI not configured yet. Ask your admin to set the GEMINI_API_KEY secret in Supabase.';
+    return 'AI not configured yet. Set the GEMINI_API_KEY secret in Supabase and redeploy the function.';
+  if (msg.includes('429'))
+    return 'AI is busy right now (rate limit). Wait a few seconds and try again.';
   if (msg.includes('not found') || msg.includes('404'))
     return 'AI function not deployed yet. Run: supabase functions deploy budget-agent-parse';
   if (msg.includes('Unauthorized') || msg.includes('401'))
