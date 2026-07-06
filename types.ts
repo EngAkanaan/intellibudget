@@ -112,10 +112,16 @@ export type BudgetAgentIntent =
   | 'payment_method'
   | 'note';
 
+export interface ConversationTurn {
+  role: 'user' | 'model';
+  text: string;
+}
+
 export interface BudgetAgentParseRequest {
   noteText: string;
   noteId?: string;
   intent?: BudgetAgentIntent;
+  messages?: ConversationTurn[];
 }
 
 export interface BudgetAgentParseResponse {
@@ -124,6 +130,19 @@ export interface BudgetAgentParseResponse {
   warnings: string[];
   suggestions: string[];
   summary?: string;
+}
+
+// Chat message for the AI Agent view (shared between full view and mini modal)
+export interface ChatMsg {
+  id: string;
+  role: 'user' | 'ai';
+  text: string;
+  actions?: AgentAction[];
+  actionStatus?: 'pending' | 'applied' | 'dismissed';
+  isLoading?: boolean;
+  noteId?: string;
+  missingFields?: string[];
+  warnings?: string[];
 }
 
 // Quick Note — synced to agent_notes in Supabase when logged in

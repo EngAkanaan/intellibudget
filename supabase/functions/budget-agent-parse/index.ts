@@ -45,6 +45,8 @@ type ParseResponse = {
   summary?: string;
 };
 
+type ConversationMessage = { role: 'user' | 'model'; text: string };
+
 type UserContext = {
   categories: string[];
   paymentMethods: string[];
@@ -253,20 +255,89 @@ function normalizeParseResult(raw: unknown): ParseResponse {
   };
 }
 
-async function callGemini(prompt: string, apiKey: string): Promise<ParseResponse> {
+function buildSystemInstruction(intent: string, ctx: UserContext): string {
+  const today = new Date().toISOString().slice(0, 10);
+  const month = currentMonth();
+
+  return `You are IntelliBudget's AI Budget Agent. Parse the user's message into structured actions for their personal finance app. This is a multi-turn conversation — use prior messages for context when resolving ambiguity.
+
+TODAY: ${today}
+CURRENT_MONTH: ${month}
+USER_INTENT_HINT: ${intent}
+
+USER DATA (use exact category and payment method names when they match):
+${JSON.stringify(ctx, null, 2)}
+
+Return ONLY valid JSON matching this schema (no markdown):
+{
+  "summary": "one sentence explaining what you understood",
+  "actions": [
+    {
+      "type": "createExpense|createIncome|createBudget|createCategory|createPaymentMethod|createRecurringPayment|createSavingGoal|createFinancialNote",
+      "payload": { },
+      "missingFields": ["field names still required"],
+      "confidence": 0.0 to 1.0,
+      "warnings": ["e.g. Over budget for Groceries"],
+      "suggestions": ["optional next steps"]
+    }
+  ],
+  "missingFields": ["global missing fields if any"],
+  "warnings": ["budget or data warnings"],
+  "suggestions": ["helpful follow-ups"]
+}
+
+Payload shapes by type:
+- createExpense: { amount: number, date: "YYYY-MM-DD", category: string, notes?: string, paymentMethod?: string }
+- createIncome: { amount: number, date: "YYYY-MM-DD", description: string, sourceType?: string, notes?: string }
+- createBudget: { month: "YYYY-MM", category: string, amount: number }
+- createCategory: { name: string }
+- createPaymentMethod: { name: string }
+- createRecurringPayment: { description: string, amount: number, category: string, dayOfMonth: number, startDate: "YYYY-MM", paymentMethod?: string }
+- createSavingGoal: { name: string, targetAmount: number, targetDate?: "YYYY-MM-DD", category?: string }
+- createFinancialNote: { text: string }
+
+Rules:
+- Prefer existing categories and payment methods from USER DATA.
+- Put unknown required fields in missingFields.
+- If the user is answering a clarification from the prior AI turn, resolve the ambiguity using their answer.
+- Amounts are numbers (no symbols in payload).`;
+}
+
+async function callGemini(
+  apiKey: string,
+  options:
+    | { mode: 'single'; prompt: string }
+    | { mode: 'multi'; systemInstruction: string; history: ConversationMessage[]; noteText: string }
+): Promise<ParseResponse> {
   const model = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.0-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  let requestBody: Record<string, unknown>;
+
+  if (options.mode === 'single') {
+    requestBody = {
+      contents: [{ parts: [{ text: options.prompt }] }],
+      generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
+    };
+  } else {
+    const contents = [
+      ...options.history.map((m) => ({
+        role: m.role,
+        parts: [{ text: m.text }],
+      })),
+      { role: 'user', parts: [{ text: options.noteText }] },
+    ];
+    requestBody = {
+      systemInstruction: { parts: [{ text: options.systemInstruction }] },
+      contents,
+      generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
+    };
+  }
 
   const geminiRes = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.2,
-        responseMimeType: 'application/json',
-      },
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!geminiRes.ok) {
@@ -339,7 +410,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Unauthorized' }, 401);
   }
 
-  let body: { noteText?: string; noteId?: string; intent?: string };
+  let body: { noteText?: string; noteId?: string; intent?: string; messages?: ConversationMessage[] };
   try {
     body = await req.json();
   } catch {
@@ -355,10 +426,30 @@ Deno.serve(async (req) => {
     typeof body.intent === 'string' && VALID_INTENTS.has(body.intent) ? body.intent : 'auto';
   const noteId = typeof body.noteId === 'string' ? body.noteId : undefined;
 
+  const messages: ConversationMessage[] = Array.isArray(body.messages)
+    ? (body.messages as ConversationMessage[]).filter(
+        (m) =>
+          (m.role === 'user' || m.role === 'model') &&
+          typeof m.text === 'string' &&
+          m.text.trim().length > 0
+      )
+    : [];
+
   try {
     const ctx = await fetchUserContext(supabase, user.id);
-    const prompt = buildPrompt(noteText, intent, ctx);
-    const result = await callGemini(prompt, geminiKey);
+
+    const result =
+      messages.length >= 2
+        ? await callGemini(geminiKey, {
+            mode: 'multi',
+            systemInstruction: buildSystemInstruction(intent, ctx),
+            history: messages,
+            noteText,
+          })
+        : await callGemini(geminiKey, {
+            mode: 'single',
+            prompt: buildPrompt(noteText, intent, ctx),
+          });
 
     if (noteId) {
       const agentStatus = deriveAgentStatus(result);
